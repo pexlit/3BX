@@ -62,6 +62,7 @@ private:
     StmtPtr classDefinition();
     StmtPtr expressionDefinition();
     StmtPtr effectDefinition();
+    StmtPtr sectionDefinition();
     StmtPtr importStatement();
     StmtPtr importFunctionDeclaration();
     StmtPtr useStatement();
@@ -85,12 +86,17 @@ private:
     std::vector<StmtPtr> parseBlockWithIndent(int baseIndent);
 
     ExprPtr expression();
+    ExprPtr logicalOr();
+    ExprPtr logicalAnd();
+    ExprPtr logicalNot();
     ExprPtr equality();
     ExprPtr comparison();
     ExprPtr term();
     ExprPtr factor();
+    ExprPtr unary();
     ExprPtr primary();
     ExprPtr intrinsicCall();
+    ExprPtr lazyExpression();
 };
 
 } // namespace tbx

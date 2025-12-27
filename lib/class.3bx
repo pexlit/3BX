@@ -4,20 +4,20 @@
 # Creating instances
 expression a new className:
     get:
-        @intrinsic("create_instance", className)
+        return @intrinsic("create_instance", className)
 
 expression create a className:
     get:
-        @intrinsic("create_instance", className)
+        return @intrinsic("create_instance", className)
 
 # Accessing members
 expression memberName of object:
     get:
-        @intrinsic("get_member", object, memberName)
+        return @intrinsic("get_member", object, memberName)
 
 expression the memberName of object:
     get:
-        @intrinsic("get_member", object, memberName)
+        return @intrinsic("get_member", object, memberName)
 
 # Setting members
 effect set memberName of object to value:
@@ -37,27 +37,27 @@ effect methodName object with arg:
 expression each member:
     used inside:
         class
-    set:
+    when set to val:
         @intrinsic("set_each_member", val)
-    add:
+    when added to val:
         @intrinsic("add_each_member", val)
-    subtract:
+    when subtracted from val:
         @intrinsic("sub_each_member", val)
-    multiply:
+    when multiplied by val:
         @intrinsic("mul_each_member", val)
-    divide:
+    when divided by val:
         @intrinsic("div_each_member", val)
 
 expression all members:
     used inside:
         class
-    set:
+    when set to val:
         @intrinsic("set_each_member", val)
-    add:
+    when added to val:
         @intrinsic("add_each_member", val)
-    subtract:
+    when subtracted from val:
         @intrinsic("sub_each_member", val)
-    multiply:
+    when multiplied by val:
         @intrinsic("mul_each_member", val)
-    divide:
+    when divided by val:
         @intrinsic("div_each_member", val)

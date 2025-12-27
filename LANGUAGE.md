@@ -41,5 +41,6 @@ give some bread to jane <-- no optional segment! but since the tree wired the en
 
 in that case, split the branches, so duplicate 'bread to dave' to the 'some' branch.
 
-missing features can be added:
-import 
+3BX compiles to machine code using LLVM, optimizing for the highest performance possible.
+
+to return a value in an expression, either 'set result to x' or 'return x'.

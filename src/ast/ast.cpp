@@ -18,11 +18,27 @@ void Identifier::accept(ASTVisitor& visitor) {
     visitor.visit(*this);
 }
 
+void BooleanLiteral::accept(ASTVisitor& visitor) {
+    visitor.visit(*this);
+}
+
+void UnaryExpr::accept(ASTVisitor& visitor) {
+    visitor.visit(*this);
+}
+
 void BinaryExpr::accept(ASTVisitor& visitor) {
     visitor.visit(*this);
 }
 
 void NaturalExpr::accept(ASTVisitor& visitor) {
+    visitor.visit(*this);
+}
+
+void LazyExpr::accept(ASTVisitor& visitor) {
+    visitor.visit(*this);
+}
+
+void BlockExpr::accept(ASTVisitor& visitor) {
     visitor.visit(*this);
 }
 

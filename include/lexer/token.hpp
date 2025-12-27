@@ -54,6 +54,16 @@ enum class TokenType {
     RESULT,
     MULTIPLY,
     APOSTROPHE,
+    SECTION,    // section pattern type for indented blocks
+
+    // Boolean literals
+    TRUE,
+    FALSE,
+
+    // Logical operators
+    AND,
+    OR,
+    NOT,
 
     // Operators
     PLUS,
@@ -64,9 +74,12 @@ enum class TokenType {
     NOT_EQUALS,
     LESS,
     GREATER,
+    LESS_EQUAL,
+    GREATER_EQUAL,
 
     // Delimiters
     COLON,
+    DOT,
     NEWLINE,
     INDENT,
     DEDENT,
@@ -75,6 +88,8 @@ enum class TokenType {
     RPAREN,
     LBRACKET,   // [ for optional syntax elements
     RBRACKET,   // ] for optional syntax elements
+    LBRACE,     // { for lazy expressions and section parameters
+    RBRACE,     // } for lazy expressions and section parameters
 
     // Intrinsic
     AT,             // @ symbol for @intrinsic
@@ -100,6 +115,6 @@ struct Token {
 };
 
 // Convert token type to string for debugging
-std::string token_type_to_string(TokenType type);
+std::string tokenTypeToString(TokenType type);
 
 } // namespace tbx

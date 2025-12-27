@@ -1,248 +1,16 @@
 # calculator_gui.3bx - GUI Calculator using OpenGL
-# A proof-of-concept demonstrating what 3BX GUI programming would look like
+# Demonstrates 3BX GUI programming with the available pattern system
 #
-# MISSING FEATURES SUMMARY:
-# - Window creation and management
-# - OpenGL rendering primitives
-# - Text rendering
-# - Mouse input handling
-# - Event loop / main loop
-# - String manipulation
-# - Arrays/lists for button storage
+# This example shows what CAN be done with the current 3BX implementation.
+# Features that require compiler changes are noted at the end.
 
 # ============================================================
-# MISSING: Import system for GUI libraries
+# Import Libraries (requires import system implementation)
 # ============================================================
-# import gui.3bx
-# import opengl.3bx
-
-# ============================================================
-# MISSING: Window Creation Intrinsics
-# ============================================================
-# Needed: @intrinsic("create_window", width, height, title) -> window handle
-# Needed: @intrinsic("window_is_open", window) -> boolean
-# Needed: @intrinsic("close_window", window)
-# Needed: @intrinsic("swap_buffers", window)
-
-pattern:
-    syntax: create a window with width w and height h titled title
-    when triggered:
-        # MISSING: @intrinsic("create_window", w, h, title)
-        @intrinsic("print", "STUB: Creating window")
-
-pattern:
-    syntax: window is open
-    when triggered:
-        # MISSING: @intrinsic("window_is_open", window)
-        @intrinsic("print", "STUB: Checking if window is open")
-
-pattern:
-    syntax: close the window
-    when triggered:
-        # MISSING: @intrinsic("close_window", window)
-        @intrinsic("print", "STUB: Closing window")
-
-pattern:
-    syntax: refresh the display
-    when triggered:
-        # MISSING: @intrinsic("swap_buffers", window)
-        @intrinsic("print", "STUB: Refreshing display")
-
-# ============================================================
-# MISSING: OpenGL Drawing Intrinsics
-# ============================================================
-# Needed: @intrinsic("gl_clear", r, g, b)
-# Needed: @intrinsic("gl_rect", x, y, width, height)
-# Needed: @intrinsic("gl_set_color", r, g, b)
-# Needed: @intrinsic("gl_text", x, y, text, fontSize)
-
-pattern:
-    syntax: clear screen with color r g b
-    when triggered:
-        # MISSING: @intrinsic("gl_clear", r, g, b)
-        @intrinsic("print", "STUB: Clearing screen")
-
-pattern:
-    syntax: set draw color to r g b
-    when triggered:
-        # MISSING: @intrinsic("gl_set_color", r, g, b)
-        @intrinsic("print", "STUB: Setting draw color")
-
-pattern:
-    syntax: draw rectangle at x y with width w and height h
-    when triggered:
-        # MISSING: @intrinsic("gl_rect", x, y, w, h)
-        @intrinsic("print", "STUB: Drawing rectangle")
-
-pattern:
-    syntax: draw text txt at x y with size s
-    when triggered:
-        # MISSING: @intrinsic("gl_text", x, y, txt, s)
-        @intrinsic("print", "STUB: Drawing text")
-
-# ============================================================
-# MISSING: Input Handling Intrinsics
-# ============================================================
-# Needed: @intrinsic("poll_events")
-# Needed: @intrinsic("mouse_clicked") -> boolean
-# Needed: @intrinsic("get_mouse_x") -> number
-# Needed: @intrinsic("get_mouse_y") -> number
-
-pattern:
-    syntax: poll input events
-    when triggered:
-        # MISSING: @intrinsic("poll_events")
-        @intrinsic("print", "STUB: Polling events")
-
-pattern:
-    syntax: mouse was clicked
-    when triggered:
-        # MISSING: @intrinsic("mouse_clicked")
-        @intrinsic("print", "STUB: Checking mouse click")
-
-pattern:
-    syntax: the mouse x position
-    when triggered:
-        # MISSING: @intrinsic("get_mouse_x")
-        @intrinsic("print", "STUB: Getting mouse X")
-
-pattern:
-    syntax: the mouse y position
-    when triggered:
-        # MISSING: @intrinsic("get_mouse_y")
-        @intrinsic("print", "STUB: Getting mouse Y")
-
-# ============================================================
-# MISSING: String Manipulation Intrinsics
-# ============================================================
-# Needed: @intrinsic("string_concat", a, b) -> string
-# Needed: @intrinsic("number_to_string", n) -> string
-# Needed: @intrinsic("string_to_number", s) -> number
-
-pattern:
-    syntax: append str to text
-    when triggered:
-        # MISSING: @intrinsic("string_concat", text, str)
-        @intrinsic("print", "STUB: Appending string")
-
-pattern:
-    syntax: number n as text
-    when triggered:
-        # MISSING: @intrinsic("number_to_string", n)
-        @intrinsic("print", "STUB: Converting number to text")
-
-pattern:
-    syntax: text t as number
-    when triggered:
-        # MISSING: @intrinsic("string_to_number", t)
-        @intrinsic("print", "STUB: Converting text to number")
-
-# ============================================================
-# MISSING: Control Flow - While Loop
-# ============================================================
-# Needed: @intrinsic("while_loop", condition, body)
-
-pattern:
-    syntax: while condition do: body
-    when triggered:
-        # MISSING: @intrinsic("while_loop", condition, body)
-        @intrinsic("print", "STUB: While loop")
-
-# ============================================================
-# Button Class Definition
-# ============================================================
-# MISSING: Full class support with methods
-
-class:
-    pattern:
-        button
-    members:
-        x, y, width, height, label, value
-
-pattern:
-    syntax: create button with label lbl and value val at posX posY
-    when triggered:
-        set btn to a new button
-        set x of btn to posX
-        set y of btn to posY
-        set width of btn to 70
-        set height of btn to 70
-        set label of btn to lbl
-        set value of btn to val
-
-pattern:
-    syntax: point px py is inside button btn
-    when triggered:
-        # MISSING: Proper boolean logic and comparison chaining
-        # Would check: px >= btn.x and px <= btn.x + btn.width
-        #          and py >= btn.y and py <= btn.y + btn.height
-        @intrinsic("print", "STUB: Checking point inside button")
-
-pattern:
-    syntax: draw button btn
-    when triggered:
-        # Draw button background
-        set draw color to 0.3 0.3 0.3
-        draw rectangle at x of btn y of btn with width width of btn and height height of btn
-        # Draw button border
-        set draw color to 0.5 0.5 0.5
-        # MISSING: draw_rect_outline intrinsic
-        # Draw button label
-        set draw color to 1.0 1.0 1.0
-        draw text label of btn at x of btn y of btn with size 24
-
-# ============================================================
-# Calculator State
-# ============================================================
-
-set displayText to "0"
-set currentNumber to 0
-set storedNumber to 0
-set currentOperator to 0
-set hasOperator to 0
-
-# ============================================================
-# Calculator Logic Patterns
-# ============================================================
-
-pattern:
-    syntax: press digit d
-    when triggered:
-        # MISSING: String operations to append digit to display
-        @intrinsic("print", d)
-
-pattern:
-    syntax: press operator op
-    when triggered:
-        set storedNumber to currentNumber
-        set currentOperator to op
-        set hasOperator to 1
-        set displayText to "0"
-        set currentNumber to 0
-
-pattern:
-    syntax: calculate result
-    when triggered:
-        # Operator codes: 1=add, 2=sub, 3=mul, 4=div
-        # MISSING: if/else control flow
-        # if currentOperator is equal to 1 then:
-        #     set currentNumber to storedNumber + currentNumber
-        # if currentOperator is equal to 2 then:
-        #     set currentNumber to storedNumber - currentNumber
-        # if currentOperator is equal to 3 then:
-        #     set currentNumber to storedNumber * currentNumber
-        # if currentOperator is equal to 4 then:
-        #     set currentNumber to storedNumber / currentNumber
-        @intrinsic("print", "STUB: Calculating result")
-
-pattern:
-    syntax: clear calculator
-    when triggered:
-        set displayText to "0"
-        set currentNumber to 0
-        set storedNumber to 0
-        set currentOperator to 0
-        set hasOperator to 0
+import lib/prelude.3bx
+import lib/print.3bx
+import lib/opengl.3bx
+import lib/class.3bx
 
 # ============================================================
 # Window Layout Constants
@@ -257,170 +25,343 @@ set startX to 15
 set startY to 100
 
 # ============================================================
+# Calculator State Variables
+# ============================================================
+
+set displayText to "0"
+set currentNumber to 0
+set storedNumber to 0
+set currentOperator to 0
+set hasOperator to 0
+
+# ============================================================
 # Main Program
 # ============================================================
 
-# Create the calculator window
-# MISSING: Actual window creation
-set mainWindow to create a window with width windowWidth and height windowHeight titled "3BX Calculator"
+# Initialize the graphics system (GLFW)
+initialize graphics
 
-# Create calculator buttons
+# Create the calculator window using opengl.3bx pattern
+# Note: glfwCreateWindow returns a window handle, but the current
+# effect pattern does not capture return values. We use a direct
+# FFI call to get the window handle.
+set mainWindow to @intrinsic("call", "glfw3", "glfwCreateWindow", windowWidth, windowHeight, "3BX Calculator", 0, 0)
+
+# Make the window the current OpenGL context
+make window mainWindow the current context
+
+# Enable vsync for smooth rendering
+enable vsync
+
+# Set up 2D orthographic projection for GUI rendering
+set matrix mode to projection
+reset matrix
+set orthographic projection 0 windowWidth windowHeight 0 -1 1
+set matrix mode to modelview
+reset matrix
+
+# Enable blending for transparency
+enable blending
+
+# ============================================================
+# Button Positions (using simple variables instead of class instances)
+# ============================================================
+
 # Row 1: 7 8 9 /
-set btn7 to create button with label "7" and value 7 at startX startY
-set btn8 to create button with label "8" and value 8 at startX + 80 startY
-set btn9 to create button with label "9" and value 9 at startX + 160 startY
-set btnDiv to create button with label "/" and value 14 at startX + 240 startY
+set btn7X to startX
+set btn7Y to startY
+set btn8X to startX + 80
+set btn8Y to startY
+set btn9X to startX + 160
+set btn9Y to startY
+set btnDivX to startX + 240
+set btnDivY to startY
 
 # Row 2: 4 5 6 *
 set row2Y to startY + 80
-set btn4 to create button with label "4" and value 4 at startX row2Y
-set btn5 to create button with label "5" and value 5 at startX + 80 row2Y
-set btn6 to create button with label "6" and value 6 at startX + 160 row2Y
-set btnMul to create button with label "*" and value 13 at startX + 240 row2Y
+set btn4X to startX
+set btn4Y to row2Y
+set btn5X to startX + 80
+set btn5Y to row2Y
+set btn6X to startX + 160
+set btn6Y to row2Y
+set btnMulX to startX + 240
+set btnMulY to row2Y
 
 # Row 3: 1 2 3 -
 set row3Y to startY + 160
-set btn1 to create button with label "1" and value 1 at startX row3Y
-set btn2 to create button with label "2" and value 2 at startX + 80 row3Y
-set btn3 to create button with label "3" and value 3 at startX + 160 row3Y
-set btnSub to create button with label "-" and value 12 at startX + 240 row3Y
+set btn1X to startX
+set btn1Y to row3Y
+set btn2X to startX + 80
+set btn2Y to row3Y
+set btn3X to startX + 160
+set btn3Y to row3Y
+set btnSubX to startX + 240
+set btnSubY to row3Y
 
 # Row 4: C 0 = +
 set row4Y to startY + 240
-set btnClear to create button with label "C" and value 100 at startX row4Y
-set btn0 to create button with label "0" and value 0 at startX + 80 row4Y
-set btnEquals to create button with label "=" and value 99 at startX + 160 row4Y
-set btnAdd to create button with label "+" and value 11 at startX + 240 row4Y
+set btnClearX to startX
+set btnClearY to row4Y
+set btn0X to startX + 80
+set btn0Y to row4Y
+set btnEqualsX to startX + 160
+set btnEqualsY to row4Y
+set btnAddX to startX + 240
+set btnAddY to row4Y
 
 # ============================================================
-# Main Loop
+# Draw a Single Frame (main loop requires while loop support)
 # ============================================================
-# MISSING: while loop support with boolean conditions
 
-# while window is open do:
-#     poll input events
-#
-#     # Clear screen with dark background
-#     clear screen with color 0.1 0.1 0.15
-#
-#     # Draw display area
-#     set draw color to 0.2 0.2 0.25
-#     draw rectangle at 10 10 with width 300 and height 70
-#
-#     # Draw display text (right-aligned would be ideal)
-#     set draw color to 0.0 1.0 0.5
-#     draw text displayText at 20 30 with size 36
-#
-#     # Draw all buttons
-#     draw button btn0
-#     draw button btn1
-#     draw button btn2
-#     draw button btn3
-#     draw button btn4
-#     draw button btn5
-#     draw button btn6
-#     draw button btn7
-#     draw button btn8
-#     draw button btn9
-#     draw button btnAdd
-#     draw button btnSub
-#     draw button btnMul
-#     draw button btnDiv
-#     draw button btnEquals
-#     draw button btnClear
-#
-#     # Handle mouse clicks
-#     if mouse was clicked then:
-#         set clickX to the mouse x position
-#         set clickY to the mouse y position
-#
-#         # Check digit buttons
-#         if point clickX clickY is inside button btn0 then:
-#             press digit 0
-#         if point clickX clickY is inside button btn1 then:
-#             press digit 1
-#         if point clickX clickY is inside button btn2 then:
-#             press digit 2
-#         if point clickX clickY is inside button btn3 then:
-#             press digit 3
-#         if point clickX clickY is inside button btn4 then:
-#             press digit 4
-#         if point clickX clickY is inside button btn5 then:
-#             press digit 5
-#         if point clickX clickY is inside button btn6 then:
-#             press digit 6
-#         if point clickX clickY is inside button btn7 then:
-#             press digit 7
-#         if point clickX clickY is inside button btn8 then:
-#             press digit 8
-#         if point clickX clickY is inside button btn9 then:
-#             press digit 9
-#
-#         # Check operator buttons
-#         if point clickX clickY is inside button btnAdd then:
-#             press operator 1
-#         if point clickX clickY is inside button btnSub then:
-#             press operator 2
-#         if point clickX clickY is inside button btnMul then:
-#             press operator 3
-#         if point clickX clickY is inside button btnDiv then:
-#             press operator 4
-#
-#         # Check equals button
-#         if point clickX clickY is inside button btnEquals then:
-#             calculate result
-#
-#         # Check clear button
-#         if point clickX clickY is inside button btnClear then:
-#             clear calculator
-#
-#     refresh the display
+# Poll for events
+poll events
 
-# Print message since we cannot actually run the GUI
-print "Calculator GUI example - demonstrates 3BX GUI patterns"
-print "See comments for required intrinsics and missing features"
+# Clear screen with dark blue-gray background
+clear screen with color 0.1 0.1 0.15
+
+# Draw the display area background
+set draw color to 0.2 0.2 0.25
+draw rectangle at 10 10 with width 300 and height 70
+
+# Draw display border
+set draw color to 0.4 0.4 0.5
+draw line from 10 10 to 310 10
+draw line from 10 80 to 310 80
+draw line from 10 10 to 10 80
+draw line from 310 10 to 310 80
 
 # ============================================================
-# SUMMARY OF MISSING INTRINSICS NEEDED FOR GUI SUPPORT
+# Draw Calculator Buttons
+# ============================================================
+
+# Button background color (dark gray)
+set draw color to 0.3 0.3 0.35
+
+# Row 1: 7 8 9 /
+draw rectangle at btn7X btn7Y with width buttonSize and height buttonSize
+draw rectangle at btn8X btn8Y with width buttonSize and height buttonSize
+draw rectangle at btn9X btn9Y with width buttonSize and height buttonSize
+draw rectangle at btnDivX btnDivY with width buttonSize and height buttonSize
+
+# Row 2: 4 5 6 *
+draw rectangle at btn4X btn4Y with width buttonSize and height buttonSize
+draw rectangle at btn5X btn5Y with width buttonSize and height buttonSize
+draw rectangle at btn6X btn6Y with width buttonSize and height buttonSize
+draw rectangle at btnMulX btnMulY with width buttonSize and height buttonSize
+
+# Row 3: 1 2 3 -
+draw rectangle at btn1X btn1Y with width buttonSize and height buttonSize
+draw rectangle at btn2X btn2Y with width buttonSize and height buttonSize
+draw rectangle at btn3X btn3Y with width buttonSize and height buttonSize
+draw rectangle at btnSubX btnSubY with width buttonSize and height buttonSize
+
+# Row 4: C 0 = +
+draw rectangle at btnClearX btnClearY with width buttonSize and height buttonSize
+draw rectangle at btn0X btn0Y with width buttonSize and height buttonSize
+draw rectangle at btnEqualsX btnEqualsY with width buttonSize and height buttonSize
+draw rectangle at btnAddX btnAddY with width buttonSize and height buttonSize
+
+# ============================================================
+# Draw Button Borders (lighter gray)
+# ============================================================
+
+set draw color to 0.5 0.5 0.55
+
+# Helper: draw border around button at x, y with size s
+# Row 1 borders
+draw line from btn7X btn7Y to btn7X + buttonSize btn7Y
+draw line from btn7X btn7Y + buttonSize to btn7X + buttonSize btn7Y + buttonSize
+draw line from btn7X btn7Y to btn7X btn7Y + buttonSize
+draw line from btn7X + buttonSize btn7Y to btn7X + buttonSize btn7Y + buttonSize
+
+draw line from btn8X btn8Y to btn8X + buttonSize btn8Y
+draw line from btn8X btn8Y + buttonSize to btn8X + buttonSize btn8Y + buttonSize
+draw line from btn8X btn8Y to btn8X btn8Y + buttonSize
+draw line from btn8X + buttonSize btn8Y to btn8X + buttonSize btn8Y + buttonSize
+
+draw line from btn9X btn9Y to btn9X + buttonSize btn9Y
+draw line from btn9X btn9Y + buttonSize to btn9X + buttonSize btn9Y + buttonSize
+draw line from btn9X btn9Y to btn9X btn9Y + buttonSize
+draw line from btn9X + buttonSize btn9Y to btn9X + buttonSize btn9Y + buttonSize
+
+draw line from btnDivX btnDivY to btnDivX + buttonSize btnDivY
+draw line from btnDivX btnDivY + buttonSize to btnDivX + buttonSize btnDivY + buttonSize
+draw line from btnDivX btnDivY to btnDivX btnDivY + buttonSize
+draw line from btnDivX + buttonSize btnDivY to btnDivX + buttonSize btnDivY + buttonSize
+
+# Row 2 borders
+draw line from btn4X btn4Y to btn4X + buttonSize btn4Y
+draw line from btn4X btn4Y + buttonSize to btn4X + buttonSize btn4Y + buttonSize
+draw line from btn4X btn4Y to btn4X btn4Y + buttonSize
+draw line from btn4X + buttonSize btn4Y to btn4X + buttonSize btn4Y + buttonSize
+
+draw line from btn5X btn5Y to btn5X + buttonSize btn5Y
+draw line from btn5X btn5Y + buttonSize to btn5X + buttonSize btn5Y + buttonSize
+draw line from btn5X btn5Y to btn5X btn5Y + buttonSize
+draw line from btn5X + buttonSize btn5Y to btn5X + buttonSize btn5Y + buttonSize
+
+draw line from btn6X btn6Y to btn6X + buttonSize btn6Y
+draw line from btn6X btn6Y + buttonSize to btn6X + buttonSize btn6Y + buttonSize
+draw line from btn6X btn6Y to btn6X btn6Y + buttonSize
+draw line from btn6X + buttonSize btn6Y to btn6X + buttonSize btn6Y + buttonSize
+
+draw line from btnMulX btnMulY to btnMulX + buttonSize btnMulY
+draw line from btnMulX btnMulY + buttonSize to btnMulX + buttonSize btnMulY + buttonSize
+draw line from btnMulX btnMulY to btnMulX btnMulY + buttonSize
+draw line from btnMulX + buttonSize btnMulY to btnMulX + buttonSize btnMulY + buttonSize
+
+# Row 3 borders
+draw line from btn1X btn1Y to btn1X + buttonSize btn1Y
+draw line from btn1X btn1Y + buttonSize to btn1X + buttonSize btn1Y + buttonSize
+draw line from btn1X btn1Y to btn1X btn1Y + buttonSize
+draw line from btn1X + buttonSize btn1Y to btn1X + buttonSize btn1Y + buttonSize
+
+draw line from btn2X btn2Y to btn2X + buttonSize btn2Y
+draw line from btn2X btn2Y + buttonSize to btn2X + buttonSize btn2Y + buttonSize
+draw line from btn2X btn2Y to btn2X btn2Y + buttonSize
+draw line from btn2X + buttonSize btn2Y to btn2X + buttonSize btn2Y + buttonSize
+
+draw line from btn3X btn3Y to btn3X + buttonSize btn3Y
+draw line from btn3X btn3Y + buttonSize to btn3X + buttonSize btn3Y + buttonSize
+draw line from btn3X btn3Y to btn3X btn3Y + buttonSize
+draw line from btn3X + buttonSize btn3Y to btn3X + buttonSize btn3Y + buttonSize
+
+draw line from btnSubX btnSubY to btnSubX + buttonSize btnSubY
+draw line from btnSubX btnSubY + buttonSize to btnSubX + buttonSize btnSubY + buttonSize
+draw line from btnSubX btnSubY to btnSubX btnSubY + buttonSize
+draw line from btnSubX + buttonSize btnSubY to btnSubX + buttonSize btnSubY + buttonSize
+
+# Row 4 borders
+draw line from btnClearX btnClearY to btnClearX + buttonSize btnClearY
+draw line from btnClearX btnClearY + buttonSize to btnClearX + buttonSize btnClearY + buttonSize
+draw line from btnClearX btnClearY to btnClearX btnClearY + buttonSize
+draw line from btnClearX + buttonSize btnClearY to btnClearX + buttonSize btnClearY + buttonSize
+
+draw line from btn0X btn0Y to btn0X + buttonSize btn0Y
+draw line from btn0X btn0Y + buttonSize to btn0X + buttonSize btn0Y + buttonSize
+draw line from btn0X btn0Y to btn0X btn0Y + buttonSize
+draw line from btn0X + buttonSize btn0Y to btn0X + buttonSize btn0Y + buttonSize
+
+draw line from btnEqualsX btnEqualsY to btnEqualsX + buttonSize btnEqualsY
+draw line from btnEqualsX btnEqualsY + buttonSize to btnEqualsX + buttonSize btnEqualsY + buttonSize
+draw line from btnEqualsX btnEqualsY to btnEqualsX btnEqualsY + buttonSize
+draw line from btnEqualsX + buttonSize btnEqualsY to btnEqualsX + buttonSize btnEqualsY + buttonSize
+
+draw line from btnAddX btnAddY to btnAddX + buttonSize btnAddY
+draw line from btnAddX btnAddY + buttonSize to btnAddX + buttonSize btnAddY + buttonSize
+draw line from btnAddX btnAddY to btnAddX btnAddY + buttonSize
+draw line from btnAddX + buttonSize btnAddY to btnAddX + buttonSize btnAddY + buttonSize
+
+# ============================================================
+# Swap buffers to display the frame
+# ============================================================
+
+swap buffers of window mainWindow
+
+# Print completion message
+print "Calculator GUI rendered one frame"
+print "The calculator buttons are displayed"
+print "See end of file for features requiring compiler changes"
+
+# Wait a moment so the window stays visible
+# Note: Proper main loop requires while loop support
+@intrinsic("call", "glfw3", "glfwWaitEvents")
+
+# Clean up
+terminate graphics
+
+# ============================================================
+# FEATURES REQUIRING COMPILER CHANGES
 # ============================================================
 #
-# Window Management:
-#   @intrinsic("create_window", width, height, title) -> window
-#   @intrinsic("window_is_open", window) -> bool
-#   @intrinsic("close_window", window)
-#   @intrinsic("swap_buffers", window)
+# This section documents what features would be needed to make
+# this calculator fully functional.
 #
-# OpenGL Drawing:
-#   @intrinsic("gl_clear", r, g, b)
-#   @intrinsic("gl_set_color", r, g, b)
-#   @intrinsic("gl_rect", x, y, width, height)
-#   @intrinsic("gl_rect_outline", x, y, width, height)
-#   @intrinsic("gl_text", x, y, text, fontSize)
+# 1. CONTROL FLOW (Critical Priority):
+#    - while loops: Needed for the main render/event loop
+#    - if/else statements: Needed for button hit detection
+#    Required intrinsics:
+#      @intrinsic("while", condition, body)
+#      @intrinsic("if", condition, thenBody, elseBody)
+#    Proposed patterns:
+#      effect while condition: body
+#      effect if condition then: thenBody else: elseBody
 #
-# Input Handling:
-#   @intrinsic("poll_events")
-#   @intrinsic("mouse_clicked") -> bool
-#   @intrinsic("get_mouse_x") -> number
-#   @intrinsic("get_mouse_y") -> number
-#   @intrinsic("key_pressed", keyCode) -> bool
+# 2. BOOLEAN OPERATIONS (Critical Priority):
+#    - and, or, not operators
+#    Required intrinsics:
+#      @intrinsic("and", a, b)
+#      @intrinsic("or", a, b)
+#      @intrinsic("not", a)
+#    Proposed patterns:
+#      expression a and b
+#      expression a or b
+#      expression not a
 #
-# String Operations:
-#   @intrinsic("string_concat", a, b) -> string
-#   @intrinsic("number_to_string", n) -> string
-#   @intrinsic("string_to_number", s) -> number
-#   @intrinsic("string_length", s) -> number
+# 3. COMPARISON OPERATORS (High Priority):
+#    - >= and <= operators
+#    Required intrinsics:
+#      @intrinsic("cmp_gte", a, b)
+#      @intrinsic("cmp_lte", a, b)
+#    Proposed patterns (add to prelude.3bx):
+#      expression val1 is greater than or equal to val2
+#      expression val1 is less than or equal to val2
+#      expression val1 >= val2
+#      expression val1 <= val2
 #
-# Control Flow:
-#   @intrinsic("while_loop", condition, body)
-#   @intrinsic("for_loop", init, condition, increment, body)
+# 4. IMPORT SYSTEM (High Priority):
+#    - Loading library files at compile time
+#    - Path resolution for lib/ directory
+#    Note: Currently imports are not processed
 #
-# Boolean Logic:
-#   @intrinsic("and", a, b) -> bool
-#   @intrinsic("or", a, b) -> bool
-#   @intrinsic("not", a) -> bool
+# 5. RETURN VALUES FROM EFFECTS (Medium Priority):
+#    - Current effects cannot return values
+#    - "create window" effect should return window handle
+#    Workaround: Use @intrinsic("call"...) directly
 #
-# Suggested Libraries (could be implemented in 3BX with above intrinsics):
-#   - gui.3bx: Window and widget abstractions
-#   - opengl.3bx: OpenGL rendering patterns
-#   - input.3bx: Keyboard and mouse handling
-#   - math.3bx: Extended math functions (sqrt, sin, cos, etc.)
+# 6. STRING OPERATIONS (Medium Priority):
+#    - String concatenation for display text
+#    - Number to string conversion
+#    Required intrinsics:
+#      @intrinsic("concat", a, b)
+#      @intrinsic("to_string", number)
+#
+# 7. FFI OUTPUT PARAMETERS (Low Priority):
+#    - glfwGetCursorPos needs pointer-to-double parameters
+#    - Current FFI only supports passing values by value
+#    Alternative: Use glfwSetCursorPosCallback (callback system)
+#
+# 8. TEXT RENDERING (Low Priority - External):
+#    - Would require FreeType or similar library
+#    - Could be added as a graphics extension library
+#
+# ============================================================
+# PATTERNS THAT WORK NOW (from libraries)
+# ============================================================
+#
+# From prelude.3bx:
+#   set var to val
+#   left + right, left - right, left * right, left / right
+#   val1 is equal to val2, is less than, is greater than
+#
+# From print.3bx:
+#   print value
+#
+# From opengl.3bx:
+#   initialize graphics, terminate graphics
+#   make window w the current context
+#   swap buffers of window w
+#   poll events, enable vsync
+#   clear screen with color r g b
+#   set draw color to r g b
+#   draw rectangle at x y with width w and height h
+#   draw line from x1 y1 to x2 y2
+#   set matrix mode to projection, set matrix mode to modelview
+#   reset matrix
+#   set orthographic projection left right bottom top near far
+#   enable blending
+#
+# Direct FFI calls:
+#   @intrinsic("call", "library", "function", args...)
+#

@@ -12,12 +12,19 @@ CodeGenerator::CodeGenerator(const std::string& module_name) {
     builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);
 }
 
+void CodeGenerator::setPatternRegistry(PatternRegistry* registry) {
+    patternRegistry_ = registry;
+    if (registry) {
+        patternMatcher_ = std::make_unique<PatternMatcher>(*registry);
+    }
+}
+
 bool CodeGenerator::generate(Program& program) {
     program.accept(*this);
     return !llvm::verifyModule(*module_, &llvm::errs());
 }
 
-bool CodeGenerator::write_ir(const std::string& filename) {
+bool CodeGenerator::writeIr(const std::string& filename) {
     std::error_code ec;
     llvm::raw_fd_ostream out(filename, ec, llvm::sys::fs::OF_None);
     if (ec) {
@@ -33,7 +40,7 @@ bool CodeGenerator::compile(const std::string& filename) {
     return false;
 }
 
-llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(
+llvm::AllocaInst* CodeGenerator::createEntryBlockAlloca(
     llvm::Function* function,
     const std::string& name,
     llvm::Type* type
@@ -74,6 +81,56 @@ void CodeGenerator::visit(Identifier& node) {
         );
     } else {
         current_value_ = nullptr;
+    }
+}
+
+void CodeGenerator::visit(BooleanLiteral& node) {
+    current_value_ = llvm::ConstantInt::get(
+        llvm::Type::getInt1Ty(*context_),
+        node.value ? 1 : 0
+    );
+}
+
+void CodeGenerator::visit(UnaryExpr& node) {
+    node.operand->accept(*this);
+    llvm::Value* operand = current_value_;
+
+    if (!operand) {
+        current_value_ = nullptr;
+        return;
+    }
+
+    switch (node.op) {
+        case TokenType::NOT: {
+            // Convert to boolean if needed
+            if (!operand->getType()->isIntegerTy(1)) {
+                if (operand->getType()->isIntegerTy()) {
+                    operand = builder_->CreateICmpNE(
+                        operand,
+                        llvm::ConstantInt::get(operand->getType(), 0),
+                        "tobool"
+                    );
+                } else if (operand->getType()->isFloatingPointTy()) {
+                    operand = builder_->CreateFCmpONE(
+                        operand,
+                        llvm::ConstantFP::get(operand->getType(), 0.0),
+                        "tobool"
+                    );
+                }
+            }
+            current_value_ = builder_->CreateNot(operand, "nottmp");
+            break;
+        }
+        case TokenType::MINUS: {
+            if (operand->getType()->isFloatingPointTy()) {
+                current_value_ = builder_->CreateFNeg(operand, "negtmp");
+            } else {
+                current_value_ = builder_->CreateNeg(operand, "negtmp");
+            }
+            break;
+        }
+        default:
+            current_value_ = nullptr;
     }
 }
 
@@ -146,6 +203,54 @@ void CodeGenerator::visit(BinaryExpr& node) {
                 ? builder_->CreateFCmpONE(left, right, "netmp")
                 : builder_->CreateICmpNE(left, right, "netmp");
             break;
+        case TokenType::LESS_EQUAL:
+            current_value_ = use_float
+                ? builder_->CreateFCmpOLE(left, right, "cmptmp")
+                : builder_->CreateICmpSLE(left, right, "cmptmp");
+            break;
+        case TokenType::GREATER_EQUAL:
+            current_value_ = use_float
+                ? builder_->CreateFCmpOGE(left, right, "cmptmp")
+                : builder_->CreateICmpSGE(left, right, "cmptmp");
+            break;
+        case TokenType::AND: {
+            // Convert operands to boolean if needed
+            if (!left->getType()->isIntegerTy(1)) {
+                if (left->getType()->isIntegerTy()) {
+                    left = builder_->CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0), "tobool");
+                } else if (left->getType()->isFloatingPointTy()) {
+                    left = builder_->CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0), "tobool");
+                }
+            }
+            if (!right->getType()->isIntegerTy(1)) {
+                if (right->getType()->isIntegerTy()) {
+                    right = builder_->CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "tobool");
+                } else if (right->getType()->isFloatingPointTy()) {
+                    right = builder_->CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0), "tobool");
+                }
+            }
+            current_value_ = builder_->CreateAnd(left, right, "andtmp");
+            break;
+        }
+        case TokenType::OR: {
+            // Convert operands to boolean if needed
+            if (!left->getType()->isIntegerTy(1)) {
+                if (left->getType()->isIntegerTy()) {
+                    left = builder_->CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0), "tobool");
+                } else if (left->getType()->isFloatingPointTy()) {
+                    left = builder_->CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0), "tobool");
+                }
+            }
+            if (!right->getType()->isIntegerTy(1)) {
+                if (right->getType()->isIntegerTy()) {
+                    right = builder_->CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "tobool");
+                } else if (right->getType()->isFloatingPointTy()) {
+                    right = builder_->CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0), "tobool");
+                }
+            }
+            current_value_ = builder_->CreateOr(left, right, "ortmp");
+            break;
+        }
         default:
             current_value_ = nullptr;
     }
@@ -153,10 +258,45 @@ void CodeGenerator::visit(BinaryExpr& node) {
 
 void CodeGenerator::visit(NaturalExpr& node) {
     // Natural language expressions need pattern matching to resolve
-    // For now, generate a placeholder value (0)
-    // TODO: Implement pattern matching at compile time
-    (void)node;
+    // Try to match the tokens against registered patterns
+    if (patternMatcher_ && !node.tokens.empty()) {
+        auto result = patternMatcher_->matchStatement(node.tokens, 0);
+        if (result && result->pattern && result->pattern->definition) {
+            // Found a matching pattern - create a PatternCall and generate code for it
+            PatternCall call;
+            call.pattern = result->pattern->definition;
+            call.bindings = std::move(result->bindings);
+            call.location = node.location;
+
+            // Generate code for the pattern call
+            visit(call);
+            return;
+        }
+    }
+
+    // No pattern matched - generate a placeholder value (0)
     current_value_ = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0);
+}
+
+void CodeGenerator::visit(LazyExpr& node) {
+    // Lazy expressions store the inner expression for deferred evaluation
+    // When codegen encounters a lazy expr directly, we just evaluate it
+    // The lazy semantics are handled by the pattern caller
+    if (node.inner) {
+        node.inner->accept(*this);
+    } else {
+        current_value_ = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0);
+    }
+}
+
+void CodeGenerator::visit(BlockExpr& node) {
+    // Block expressions contain a list of statements
+    // Generate code for each statement in the block
+    for (auto& stmt : node.statements) {
+        stmt->accept(*this);
+    }
+    // Block doesn't produce a value
+    current_value_ = nullptr;
 }
 
 void CodeGenerator::visit(ExpressionStmt& node) {
@@ -174,7 +314,7 @@ void CodeGenerator::visit(SetStatement& node) {
     } else {
         // Create new variable
         llvm::Function* function = builder_->GetInsertBlock()->getParent();
-        llvm::AllocaInst* alloca = create_entry_block_alloca(
+        llvm::AllocaInst* alloca = createEntryBlockAlloca(
             function,
             node.variable,
             value->getType()
@@ -286,7 +426,7 @@ void CodeGenerator::visit(FunctionDecl& node) {
     // Add parameters to symbol table
     named_values_.clear();
     for (auto& arg : function->args()) {
-        llvm::AllocaInst* alloca = create_entry_block_alloca(
+        llvm::AllocaInst* alloca = createEntryBlockAlloca(
             function,
             std::string(arg.getName()),
             arg.getType()
@@ -302,6 +442,18 @@ void CodeGenerator::visit(FunctionDecl& node) {
 
     // Default return
     builder_->CreateRet(llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0));
+}
+
+// Helper to resolve an intrinsic argument - checks if it's an Identifier that maps to a deferred binding
+Expression* CodeGenerator::resolveDeferredBinding(Expression* arg) {
+    auto* id = dynamic_cast<Identifier*>(arg);
+    if (id) {
+        auto it = deferredBindings_.find(id->name);
+        if (it != deferredBindings_.end()) {
+            return it->second;
+        }
+    }
+    return arg;
 }
 
 void CodeGenerator::visit(IntrinsicCall& node) {
@@ -320,7 +472,7 @@ void CodeGenerator::visit(IntrinsicCall& node) {
                         builder_->CreateStore(value, it->second);
                     } else {
                         llvm::Function* function = builder_->GetInsertBlock()->getParent();
-                        llvm::AllocaInst* alloca = create_entry_block_alloca(
+                        llvm::AllocaInst* alloca = createEntryBlockAlloca(
                             function, id->name, value->getType());
                         builder_->CreateStore(value, alloca);
                         named_values_[id->name] = alloca;
@@ -415,6 +567,156 @@ void CodeGenerator::visit(IntrinsicCall& node) {
         }
         current_value_ = nullptr;
     }
+    else if (node.name == "execute") {
+        // @intrinsic("execute", block) - Execute a captured code block
+        // The block is a BlockExpr containing statements to execute
+        if (node.args.size() >= 1) {
+            // Resolve the argument (may be an Identifier referring to a deferred binding)
+            Expression* resolved = resolveDeferredBinding(node.args[0].get());
+            auto* blockExpr = dynamic_cast<BlockExpr*>(resolved);
+            if (blockExpr) {
+                // Generate code for each statement in the block
+                for (auto& stmt : blockExpr->statements) {
+                    stmt->accept(*this);
+                }
+            } else {
+                // If not a BlockExpr, just evaluate the expression
+                resolved->accept(*this);
+            }
+        }
+        current_value_ = nullptr;
+    }
+    else if (node.name == "evaluate") {
+        // @intrinsic("evaluate", expr) - Evaluate a lazy expression
+        // Unwraps a LazyExpr and evaluates its inner expression
+        if (node.args.size() >= 1) {
+            // Resolve the argument (may be an Identifier referring to a deferred binding)
+            Expression* resolved = resolveDeferredBinding(node.args[0].get());
+            auto* lazyExpr = dynamic_cast<LazyExpr*>(resolved);
+            if (lazyExpr && lazyExpr->inner) {
+                // Evaluate the inner expression
+                lazyExpr->inner->accept(*this);
+            } else {
+                // Not a LazyExpr, just evaluate directly
+                resolved->accept(*this);
+            }
+        } else {
+            current_value_ = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0);
+        }
+    }
+    else if (node.name == "execute_if") {
+        // @intrinsic("execute_if", condition, block) - Execute block only if condition is true
+        // Takes a lazy condition and a block, evaluates condition, executes block only if true
+        if (node.args.size() >= 2) {
+            // Resolve arguments (may be Identifiers referring to deferred bindings)
+            Expression* condArg = resolveDeferredBinding(node.args[0].get());
+            Expression* blockArg = resolveDeferredBinding(node.args[1].get());
+
+            // Evaluate the condition (may be lazy)
+            auto* lazyExpr = dynamic_cast<LazyExpr*>(condArg);
+            if (lazyExpr && lazyExpr->inner) {
+                lazyExpr->inner->accept(*this);
+            } else {
+                condArg->accept(*this);
+            }
+            llvm::Value* cond = current_value_;
+            if (!cond) {
+                current_value_ = nullptr;
+                return;
+            }
+
+            // Convert to boolean if needed
+            if (!cond->getType()->isIntegerTy(1)) {
+                if (cond->getType()->isIntegerTy()) {
+                    cond = builder_->CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "tobool");
+                } else if (cond->getType()->isDoubleTy()) {
+                    cond = builder_->CreateFCmpONE(cond, llvm::ConstantFP::get(cond->getType(), 0.0), "tobool");
+                }
+            }
+
+            llvm::Function* function = builder_->GetInsertBlock()->getParent();
+            llvm::BasicBlock* thenBB = llvm::BasicBlock::Create(*context_, "execute_if.then", function);
+            llvm::BasicBlock* endBB = llvm::BasicBlock::Create(*context_, "execute_if.end");
+
+            builder_->CreateCondBr(cond, thenBB, endBB);
+
+            // Then block - execute the block
+            builder_->SetInsertPoint(thenBB);
+            auto* blockExpr = dynamic_cast<BlockExpr*>(blockArg);
+            if (blockExpr) {
+                for (auto& stmt : blockExpr->statements) {
+                    stmt->accept(*this);
+                }
+            } else {
+                blockArg->accept(*this);
+            }
+            builder_->CreateBr(endBB);
+
+            // End block
+            function->insert(function->end(), endBB);
+            builder_->SetInsertPoint(endBB);
+        }
+        current_value_ = nullptr;
+    }
+    else if (node.name == "loop_while") {
+        // @intrinsic("loop_while", condition, block) - Loop while condition is true
+        // Generates proper LLVM loop: evaluate condition, if true execute block and repeat
+        if (node.args.size() >= 2) {
+            // Resolve arguments (may be Identifiers referring to deferred bindings)
+            Expression* condArg = resolveDeferredBinding(node.args[0].get());
+            Expression* blockArg = resolveDeferredBinding(node.args[1].get());
+
+            llvm::Function* function = builder_->GetInsertBlock()->getParent();
+
+            llvm::BasicBlock* condBB = llvm::BasicBlock::Create(*context_, "loop_while.cond", function);
+            llvm::BasicBlock* bodyBB = llvm::BasicBlock::Create(*context_, "loop_while.body");
+            llvm::BasicBlock* endBB = llvm::BasicBlock::Create(*context_, "loop_while.end");
+
+            // Branch to condition block
+            builder_->CreateBr(condBB);
+
+            // Condition block - evaluate the condition
+            builder_->SetInsertPoint(condBB);
+            auto* lazyExpr = dynamic_cast<LazyExpr*>(condArg);
+            if (lazyExpr && lazyExpr->inner) {
+                lazyExpr->inner->accept(*this);
+            } else {
+                condArg->accept(*this);
+            }
+            llvm::Value* cond = current_value_;
+            if (!cond) {
+                cond = llvm::ConstantInt::get(llvm::Type::getInt1Ty(*context_), 0);
+            }
+
+            // Convert to boolean if needed
+            if (!cond->getType()->isIntegerTy(1)) {
+                if (cond->getType()->isIntegerTy()) {
+                    cond = builder_->CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "tobool");
+                } else if (cond->getType()->isDoubleTy()) {
+                    cond = builder_->CreateFCmpONE(cond, llvm::ConstantFP::get(cond->getType(), 0.0), "tobool");
+                }
+            }
+            builder_->CreateCondBr(cond, bodyBB, endBB);
+
+            // Body block - execute the block and loop back
+            function->insert(function->end(), bodyBB);
+            builder_->SetInsertPoint(bodyBB);
+            auto* blockExpr = dynamic_cast<BlockExpr*>(blockArg);
+            if (blockExpr) {
+                for (auto& stmt : blockExpr->statements) {
+                    stmt->accept(*this);
+                }
+            } else {
+                blockArg->accept(*this);
+            }
+            builder_->CreateBr(condBB);  // Loop back to condition
+
+            // End block
+            function->insert(function->end(), endBB);
+            builder_->SetInsertPoint(endBB);
+        }
+        current_value_ = nullptr;
+    }
     else if (node.name == "call") {
         // @intrinsic("call", "LIBRARY", "functionName", arg1, arg2, ...)
         // First argument is the library name (string)
@@ -502,34 +804,125 @@ void CodeGenerator::visit(PatternDef& node) {
     (void)node;
 }
 
+bool CodeGenerator::isTailRecursion(Statement* stmt) {
+    // Check if a statement is a recursive call to the current pattern
+    auto* exprStmt = dynamic_cast<ExpressionStmt*>(stmt);
+    if (!exprStmt || !exprStmt->expression) return false;
+
+    auto* patternCall = dynamic_cast<PatternCall*>(exprStmt->expression.get());
+    if (!patternCall || !patternCall->pattern) return false;
+
+    // Check if this is calling the same pattern we're currently executing
+    if (patternStack_.empty()) return false;
+    return patternCall->pattern == patternStack_.back().pattern;
+}
+
 void CodeGenerator::visit(PatternCall& node) {
     // Execute the pattern's when_triggered body with bindings
-    // For now, substitute bindings into the pattern's body
+    // With tail-call optimization for recursive patterns
+
+    if (!node.pattern) {
+        current_value_ = nullptr;
+        return;
+    }
+
+    // Check if this is a tail-recursive call
+    if (!patternStack_.empty()) {
+        auto& ctx = patternStack_.back();
+        if (ctx.inTailPosition && ctx.pattern == node.pattern && ctx.loopHeader) {
+            // This is a tail-recursive call - update bindings and jump back
+            for (auto& [name, expr] : node.bindings) {
+                expr->accept(*this);
+                if (current_value_ && ctx.bindings) {
+                    auto it = ctx.bindings->find(name);
+                    if (it != ctx.bindings->end()) {
+                        builder_->CreateStore(current_value_, it->second);
+                    }
+                }
+            }
+            // Jump back to loop header
+            builder_->CreateBr(ctx.loopHeader);
+            current_value_ = nullptr;
+            return;
+        }
+    }
 
     // Save current named_values
     auto saved_values = named_values_;
 
-    // Add pattern bindings to named_values
+    // Store BlockExpr and LazyExpr bindings for later access by intrinsics
+    // These should not be evaluated/executed during binding setup
+    std::unordered_map<std::string, Expression*> deferredBindings;
+
+    // Create allocas for bindings and evaluate initial values
+    std::unordered_map<std::string, llvm::AllocaInst*> patternBindings;
+    llvm::Function* function = builder_->GetInsertBlock()->getParent();
+
     for (auto& [name, expr] : node.bindings) {
+        // BlockExpr and LazyExpr should NOT be evaluated here - store for later
+        if (dynamic_cast<BlockExpr*>(expr.get()) || dynamic_cast<LazyExpr*>(expr.get())) {
+            deferredBindings[name] = expr.get();
+            continue;
+        }
+
         expr->accept(*this);
         if (current_value_) {
-            llvm::Function* function = builder_->GetInsertBlock()->getParent();
-            llvm::AllocaInst* alloca = create_entry_block_alloca(
+            llvm::AllocaInst* alloca = createEntryBlockAlloca(
                 function, name, current_value_->getType());
             builder_->CreateStore(current_value_, alloca);
             named_values_[name] = alloca;
+            patternBindings[name] = alloca;
         }
     }
 
-    // Generate code for when_triggered
-    if (node.pattern) {
-        for (auto& stmt : node.pattern->when_triggered) {
-            stmt->accept(*this);
+    // Store deferred bindings in a member variable so intrinsics can access them
+    deferredBindings_ = std::move(deferredBindings);
+
+    // Create basic blocks for the pattern body loop (for tail-call optimization)
+    llvm::BasicBlock* patternBodyBB = llvm::BasicBlock::Create(*context_, "pattern.body", function);
+    llvm::BasicBlock* patternEndBB = llvm::BasicBlock::Create(*context_, "pattern.end");
+
+    // Jump to pattern body
+    builder_->CreateBr(patternBodyBB);
+    builder_->SetInsertPoint(patternBodyBB);
+
+    // Set up pattern context for tail-call optimization
+    PatternContext ctx;
+    ctx.pattern = node.pattern;
+    ctx.loopHeader = patternBodyBB;
+    ctx.bindings = &patternBindings;
+    ctx.inTailPosition = false;
+    patternStack_.push_back(ctx);
+
+    // Generate code for when_triggered body with tail-call detection
+    auto& stmts = node.pattern->when_triggered;
+    for (size_t i = 0; i < stmts.size(); ++i) {
+        // Mark the last statement as being in tail position
+        if (i == stmts.size() - 1) {
+            patternStack_.back().inTailPosition = true;
+        }
+
+        stmts[i]->accept(*this);
+
+        // If the last statement was a tail call, it already added a branch
+        // and we should not add a fallthrough
+        if (i == stmts.size() - 1 && isTailRecursion(stmts[i].get())) {
+            // The recursive call already created the branch - don't add fallthrough
         }
     }
+
+    patternStack_.pop_back();
+
+    // Only add fallthrough if the block doesn't already have a terminator
+    if (!builder_->GetInsertBlock()->getTerminator()) {
+        builder_->CreateBr(patternEndBB);
+    }
+
+    // Continue after pattern
+    function->insert(function->end(), patternEndBB);
+    builder_->SetInsertPoint(patternEndBB);
 
     // For expression patterns, return the 'result' variable value
-    // This allows patterns to return computed values
     auto result_it = named_values_.find("result");
     if (result_it != named_values_.end()) {
         current_value_ = builder_->CreateLoad(

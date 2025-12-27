@@ -50,6 +50,14 @@ set(LSP_SOURCES
     src/lsp/lspServer.cpp
 )
 
+set(DAP_SOURCES
+    src/dap/dapServer.cpp
+)
+
+set(INTERPRETER_SOURCES
+    src/interpreter/interpreter.cpp
+)
+
 # Main executable
 add_executable(3bx
     src/main.cpp
@@ -60,6 +68,8 @@ add_executable(3bx
     ${CODEGEN_SOURCES}
     ${PATTERN_SOURCES}
     ${LSP_SOURCES}
+    ${DAP_SOURCES}
+    ${INTERPRETER_SOURCES}
 )
 
 # Link LLVM libraries

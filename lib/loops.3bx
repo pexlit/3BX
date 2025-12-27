@@ -1,0 +1,161 @@
+# 3BX Standard Library - Loop Patterns
+# This module provides common loop constructs using the pattern system.
+# All loops use the loop_while intrinsic for efficiency - they compile
+# directly to LLVM loops without recursive pattern calls.
+
+# =============================================================================
+# While Loop
+# =============================================================================
+# Basic while loop with a lazy condition.
+# The condition is re-evaluated on each iteration.
+#
+# Usage:
+#   loop while {x < 10}:
+#       print x
+#       set x to x + 1
+#
+section loop while {condition}:
+    when triggered:
+        @intrinsic("loop_while", condition, section)
+
+# =============================================================================
+# Repeat N Times
+# =============================================================================
+# Loop a fixed number of times.
+# The variable 'loopindex' is available in the loop body (0-indexed).
+#
+# Usage:
+#   loop 5 times:
+#       print "Hello"
+#
+section loop count times:
+    when triggered:
+        set loopindex to 0
+        loop while {loopindex < count}:
+            @intrinsic("execute", section)
+            set loopindex to loopindex + 1
+
+# =============================================================================
+# Do-While Loop
+# =============================================================================
+# Executes the body at least once, then continues while condition is true.
+#
+# Usage:
+#   set x to 0
+#   do then loop while {x < 5}:
+#       print x
+#       set x to x + 1
+#
+section do then loop while {condition}:
+    when triggered:
+        @intrinsic("execute", section)
+        @intrinsic("loop_while", condition, section)
+
+# =============================================================================
+# Range Loop (Exclusive)
+# =============================================================================
+# Loop from start to end (exclusive). The variable 'loopindex' contains
+# the current value.
+#
+# Usage:
+#   loop from 1 to 10:
+#       print loopindex
+#
+section loop from startval to endval:
+    when triggered:
+        set loopindex to startval
+        loop while {loopindex < endval}:
+            @intrinsic("execute", section)
+            set loopindex to loopindex + 1
+
+# =============================================================================
+# Range Loop (Inclusive)
+# =============================================================================
+# Loop from start to end (inclusive). The variable 'loopindex' contains
+# the current value.
+#
+# Usage:
+#   loop from 1 through 10:
+#       print loopindex
+#
+section loop from startval through endval:
+    when triggered:
+        set loopindex to startval
+        set limit to endval + 1
+        loop while {loopindex < limit}:
+            @intrinsic("execute", section)
+            set loopindex to loopindex + 1
+
+# =============================================================================
+# Countdown Loop
+# =============================================================================
+# Loop counting down from a value to 1.
+# The variable 'loopindex' contains the current value.
+#
+# Usage:
+#   countdown from 10:
+#       print loopindex
+#       # prints 10, 9, 8, ..., 1
+#
+section countdown from startval:
+    when triggered:
+        set loopindex to startval
+        loop while {loopindex > 0}:
+            @intrinsic("execute", section)
+            set loopindex to loopindex - 1
+
+# =============================================================================
+# Loop Until
+# =============================================================================
+# Loop until a condition becomes true (opposite of while).
+# Uses execute_if to check the negated condition.
+#
+# Usage:
+#   set x to 0
+#   loop until {x == 5}:
+#       print x
+#       set x to x + 1
+#
+section loop until {condition}:
+    when triggered:
+        set shouldcontinue to 1
+        @intrinsic("execute_if", condition, {set shouldcontinue to 0})
+        loop while {shouldcontinue == 1}:
+            @intrinsic("execute", section)
+            set shouldcontinue to 1
+            @intrinsic("execute_if", condition, {set shouldcontinue to 0})
+
+# =============================================================================
+# Forever Loop
+# =============================================================================
+# Infinite loop - use with caution! Must contain a break mechanism.
+# This is primarily for demonstration; use loop while {1} for infinite loops.
+#
+# Usage:
+#   set x to 0
+#   loop forever:
+#       set x to x + 1
+#       if x > 100 then:
+#           # Need a way to break
+#
+section loop forever:
+    when triggered:
+        @intrinsic("loop_while", {1}, section)
+
+# =============================================================================
+# Step Loop
+# =============================================================================
+# Loop from start to end with a custom step value.
+# The variable 'loopindex' contains the current value.
+#
+# Usage:
+#   loop from 0 to 10 by 2:
+#       print loopindex
+#       # prints 0, 2, 4, 6, 8
+#
+section loop from startval to endval by stepval:
+    when triggered:
+        set loopindex to startval
+        loop while {loopindex < endval}:
+            @intrinsic("execute", section)
+            set loopindex to loopindex + stepval

@@ -8,5 +8,8 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+!out/**
 node_modules/**
-!node_modules/vscode-languageclient/**
+esbuild.js
+package-lock.json
+*.vsix

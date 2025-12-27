@@ -5,11 +5,16 @@
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
-    { "include": "#numbers" },
+    { "include": "#lazy-expression" },
     { "include": "#intrinsics" },
-    { "include": "#pattern-definition" },
-    { "include": "#section-headers" },
-    { "include": "#keywords" },
+    { "include": "#pattern-definition-header" },
+    { "include": "#pattern-block-headers" },
+    { "include": "#import-statement" },
+    { "include": "#numbers" },
+    { "include": "#control-keywords" },
+    { "include": "#declaration-keywords" },
+    { "include": "#operator-keywords" },
+    { "include": "#article-keywords" },
     { "include": "#operators" },
     { "include": "#identifiers" }
   ],
@@ -18,6 +23,7 @@
       "name": "comment.line.number-sign.3bx",
       "match": "#.*$"
     },
+
     "strings": {
       "name": "string.quoted.double.3bx",
       "begin": "\"",
@@ -29,6 +35,28 @@
         }
       ]
     },
+
+    "lazy-expression": {
+      "name": "meta.lazy-expression.3bx",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.lazy.begin.3bx" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.lazy.end.3bx" }
+      },
+      "contentName": "meta.embedded.lazy.3bx",
+      "patterns": [
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#control-keywords" },
+        { "include": "#operator-keywords" },
+        { "include": "#operators" },
+        { "include": "#identifiers" }
+      ]
+    },
+
     "numbers": {
       "patterns": [
         {
@@ -41,11 +69,12 @@
         }
       ]
     },
+
     "intrinsics": {
       "name": "meta.intrinsic.3bx",
       "begin": "(@intrinsic)\\s*(\\()",
       "beginCaptures": {
-        "1": { "name": "support.function.builtin.3bx" },
+        "1": { "name": "support.function.builtin.intrinsic.3bx" },
         "2": { "name": "punctuation.definition.arguments.begin.3bx" }
       },
       "end": "\\)",
@@ -54,11 +83,8 @@
       },
       "patterns": [
         {
-          "name": "string.quoted.double.intrinsic-name.3bx",
-          "match": "\"(store|load|add|sub|mul|div|print|eq|ne|lt|le|gt|ge|mod|neg|call|return|branch|phi|alloca|gep|cast|and|or|xor|shl|shr)\"",
-          "captures": {
-            "0": { "name": "support.constant.intrinsic-type.3bx" }
-          }
+          "name": "support.constant.intrinsic-operation.3bx",
+          "match": "\"(store|load|add|sub|mul|div|print|eq|ne|lt|le|gt|ge|mod|neg|call|return|branch|phi|alloca|gep|cast|and|or|xor|shl|shr|cmp_eq|cmp_lt|cmp_gt|cmp_lte|cmp_gte|cmp_neq|evaluate|execute)\""
         },
         { "include": "#strings" },
         { "include": "#numbers" },
@@ -69,91 +95,244 @@
         }
       ]
     },
-    "pattern-definition": {
+
+    "import-statement": {
+      "name": "meta.import.3bx",
+      "match": "^(import)\\s+(.+)$",
+      "captures": {
+        "1": { "name": "keyword.control.import.3bx" },
+        "2": { "name": "string.unquoted.import-path.3bx" }
+      }
+    },
+
+    "pattern-definition-header": {
       "patterns": [
         {
-          "name": "meta.pattern.3bx",
-          "match": "^(pattern)\\s*(:)\\s*$",
-          "captures": {
-            "1": { "name": "keyword.declaration.pattern.3bx" },
-            "2": { "name": "punctuation.definition.section.3bx" }
-          }
+          "comment": "Effect pattern definition - side effect patterns",
+          "name": "meta.pattern.effect.3bx",
+          "begin": "^(effect)\\s+",
+          "beginCaptures": {
+            "1": { "name": "storage.type.effect.3bx" }
+          },
+          "end": "(:)\\s*$",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.pattern.3bx" }
+          },
+          "patterns": [
+            { "include": "#pattern-syntax-content" }
+          ]
         },
         {
-          "name": "meta.pattern.syntax.3bx",
-          "begin": "^(\\s+)(syntax)\\s*(:)\\s*",
+          "comment": "Expression pattern definition - value-returning patterns",
+          "name": "meta.pattern.expression.3bx",
+          "begin": "^(expression)\\s+",
           "beginCaptures": {
-            "2": { "name": "keyword.declaration.syntax.3bx" },
-            "3": { "name": "punctuation.definition.section.3bx" }
+            "1": { "name": "storage.type.expression.3bx" }
           },
-          "end": "$",
+          "end": "(:)\\s*$",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.pattern.3bx" }
+          },
+          "patterns": [
+            { "include": "#pattern-syntax-content" }
+          ]
+        },
+        {
+          "comment": "Section pattern definition - block patterns",
+          "name": "meta.pattern.section.3bx",
+          "begin": "^(section)\\s+",
+          "beginCaptures": {
+            "1": { "name": "storage.type.section.3bx" }
+          },
+          "end": "(:)\\s*$",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.pattern.3bx" }
+          },
+          "patterns": [
+            { "include": "#pattern-syntax-content" }
+          ]
+        },
+        {
+          "comment": "Condition pattern definition",
+          "name": "meta.pattern.condition.3bx",
+          "begin": "^(condition)\\s+",
+          "beginCaptures": {
+            "1": { "name": "storage.type.condition.3bx" }
+          },
+          "end": "(:)\\s*$",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.pattern.3bx" }
+          },
+          "patterns": [
+            { "include": "#pattern-syntax-content" }
+          ]
+        },
+        {
+          "comment": "Legacy pattern definition",
+          "name": "meta.pattern.legacy.3bx",
+          "match": "^(pattern)\\s*(:)\\s*$",
+          "captures": {
+            "1": { "name": "storage.type.pattern.3bx" },
+            "2": { "name": "punctuation.definition.pattern.3bx" }
+          }
+        }
+      ]
+    },
+
+    "pattern-syntax-content": {
+      "patterns": [
+        {
+          "comment": "Lazy expression placeholder in pattern syntax",
+          "name": "meta.lazy-placeholder.3bx",
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.lazy.begin.3bx" }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.lazy.end.3bx" }
+          },
           "patterns": [
             {
-              "name": "keyword.control.3bx",
-              "match": "\\b(set|to|if|then|else|while|loop|function|return|is|the|a|an|and|or|not|pattern|syntax|when|parsed|triggered|priority|import)\\b"
-            },
-            {
-              "name": "variable.parameter.pattern.3bx",
-              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+              "name": "variable.parameter.lazy.3bx",
+              "match": "[a-zA-Z_][a-zA-Z0-9_]*"
             }
           ]
         },
         {
-          "name": "meta.pattern.when.3bx",
-          "match": "^(\\s+)(when)\\s+(triggered|parsed)\\s*(:)\\s*$",
+          "comment": "Reserved words in pattern syntax become literals",
+          "name": "keyword.other.pattern-literal.3bx",
+          "match": "\\b(set|to|if|then|else|while|loop|function|return|is|the|a|an|and|or|not|from|with|by|at|of|for|in|on|as|into)\\b"
+        },
+        {
+          "comment": "Operators in pattern syntax",
+          "name": "keyword.operator.pattern.3bx",
+          "match": "[+\\-*/]|==|!=|<=|>=|<|>"
+        },
+        {
+          "comment": "Non-reserved words become parameters",
+          "name": "variable.parameter.pattern.3bx",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+
+    "pattern-block-headers": {
+      "patterns": [
+        {
+          "comment": "Legacy syntax: line in pattern block",
+          "name": "meta.pattern.syntax-line.3bx",
+          "begin": "^(\\s+)(syntax)\\s*(:)\\s*",
+          "beginCaptures": {
+            "2": { "name": "keyword.other.syntax.3bx" },
+            "3": { "name": "punctuation.definition.block.3bx" }
+          },
+          "end": "$",
+          "patterns": [
+            { "include": "#pattern-syntax-content" }
+          ]
+        },
+        {
+          "comment": "When triggered block header",
+          "name": "meta.pattern.when-triggered.3bx",
+          "match": "^(\\s+)(when)\\s+(triggered)\\s*(:)\\s*$",
           "captures": {
             "2": { "name": "keyword.control.when.3bx" },
-            "3": { "name": "keyword.control.trigger-type.3bx" },
-            "4": { "name": "punctuation.definition.section.3bx" }
+            "3": { "name": "keyword.control.triggered.3bx" },
+            "4": { "name": "punctuation.definition.block.3bx" }
           }
         },
         {
+          "comment": "When parsed block header",
+          "name": "meta.pattern.when-parsed.3bx",
+          "match": "^(\\s+)(when)\\s+(parsed)\\s*(:)\\s*$",
+          "captures": {
+            "2": { "name": "keyword.control.when.3bx" },
+            "3": { "name": "keyword.control.parsed.3bx" },
+            "4": { "name": "punctuation.definition.block.3bx" }
+          }
+        },
+        {
+          "comment": "Get block header (for expressions)",
+          "name": "meta.pattern.get-block.3bx",
+          "match": "^(\\s+)(get)\\s*(:)\\s*$",
+          "captures": {
+            "2": { "name": "keyword.control.get.3bx" },
+            "3": { "name": "punctuation.definition.block.3bx" }
+          }
+        },
+        {
+          "comment": "Set block header (for expressions with setters)",
+          "name": "meta.pattern.set-block.3bx",
+          "match": "^(\\s+)(set)\\s*(:)\\s*$",
+          "captures": {
+            "2": { "name": "keyword.control.set.3bx" },
+            "3": { "name": "punctuation.definition.block.3bx" }
+          }
+        },
+        {
+          "comment": "Priority specification",
           "name": "meta.pattern.priority.3bx",
           "match": "^(\\s+)(priority)\\s*(:)\\s*(\\d+)\\s*$",
           "captures": {
             "2": { "name": "keyword.other.priority.3bx" },
-            "3": { "name": "punctuation.definition.section.3bx" },
+            "3": { "name": "punctuation.definition.block.3bx" },
             "4": { "name": "constant.numeric.priority.3bx" }
           }
         }
       ]
     },
-    "section-headers": {
+
+    "control-keywords": {
       "patterns": [
         {
-          "name": "meta.section.3bx",
-          "match": "^([a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)\\s*$",
-          "captures": {
-            "1": { "name": "entity.name.section.3bx" },
-            "2": { "name": "punctuation.definition.section.3bx" }
-          }
+          "comment": "Control flow keywords",
+          "name": "keyword.control.3bx",
+          "match": "\\b(if|then|else|while|loop|return|from|to)\\b"
         }
       ]
     },
-    "keywords": {
+
+    "declaration-keywords": {
       "patterns": [
         {
-          "name": "keyword.control.3bx",
-          "match": "\\b(set|to|if|then|else|while|loop|return)\\b"
+          "comment": "Variable assignment keyword",
+          "name": "keyword.operator.assignment.3bx",
+          "match": "\\b(set)\\b"
         },
         {
-          "name": "keyword.declaration.3bx",
-          "match": "\\b(function|pattern|syntax)\\b"
+          "comment": "Print effect",
+          "name": "support.function.builtin.print.3bx",
+          "match": "\\b(print)\\b"
         },
         {
-          "name": "keyword.other.3bx",
-          "match": "\\b(when|parsed|triggered|priority|import)\\b"
-        },
+          "comment": "Pattern-related keywords (outside of definitions)",
+          "name": "keyword.other.pattern.3bx",
+          "match": "\\b(pattern|syntax|when|parsed|triggered|priority)\\b"
+        }
+      ]
+    },
+
+    "operator-keywords": {
+      "patterns": [
         {
-          "name": "keyword.operator.word.3bx",
+          "comment": "Boolean and comparison operators",
+          "name": "keyword.operator.logical.3bx",
           "match": "\\b(is|and|or|not)\\b"
-        },
+        }
+      ]
+    },
+
+    "article-keywords": {
+      "patterns": [
         {
+          "comment": "Article words (natural language style)",
           "name": "keyword.other.article.3bx",
           "match": "\\b(the|a|an)\\b"
         }
       ]
     },
+
     "operators": {
       "patterns": [
         {
@@ -165,7 +344,7 @@
           "match": "(==|!=|<=|>=|<|>)"
         },
         {
-          "name": "punctuation.definition.section.3bx",
+          "name": "punctuation.definition.block.3bx",
           "match": ":"
         },
         {
@@ -179,16 +358,28 @@
         {
           "name": "punctuation.bracket.square.3bx",
           "match": "[\\[\\]]"
-        },
-        {
-          "name": "punctuation.bracket.curly.3bx",
-          "match": "[{}]"
         }
       ]
     },
+
     "identifiers": {
-      "name": "variable.other.3bx",
-      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+      "patterns": [
+        {
+          "comment": "Constants (UPPER_CASE identifiers)",
+          "name": "constant.other.3bx",
+          "match": "\\b[A-Z][A-Z0-9_]*\\b"
+        },
+        {
+          "comment": "Private/internal variables (starting with underscore)",
+          "name": "variable.other.private.3bx",
+          "match": "\\b_[a-zA-Z0-9_]*\\b"
+        },
+        {
+          "comment": "Regular identifiers",
+          "name": "variable.other.3bx",
+          "match": "\\b[a-zA-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
     }
   }
 }

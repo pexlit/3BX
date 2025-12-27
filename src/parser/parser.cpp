@@ -10,7 +10,7 @@ static const std::set<std::string> reservedWords = {
     "is", "the", "a", "an", "and", "or", "not", "pattern", "syntax", "when",
     "parsed", "triggered", "priority", "import", "class", "members", "created",
     "new", "of", "with", "by", "each", "member", "print", "use", "from",
-    "multiply", "add", "subtract", "divide"
+    "multiply", "add", "subtract", "divide", "section", "true", "false"
 };
 
 Parser::Parser(Lexer& lexer) : lexer_(lexer) {
@@ -31,7 +31,7 @@ PatternRegistry& Parser::activeRegistry() {
 
 void Parser::advance() {
     previous_ = current_;
-    current_ = lexer_.next_token();
+    current_ = lexer_.nextToken();
 }
 
 bool Parser::check(TokenType type) {
@@ -94,6 +94,9 @@ StmtPtr Parser::statement() {
     }
     if (match(TokenType::EFFECT)) {
         return effectDefinition();
+    }
+    if (match(TokenType::SECTION)) {
+        return sectionDefinition();
     }
     if (match(TokenType::IMPORT)) {
         return importStatement();
@@ -217,6 +220,22 @@ StmtPtr Parser::matchPatternStatement() {
         call->bindings = std::move(result->bindings);
         call->location = startToken.location;
 
+        // Check if the pattern has a Section parameter - if so, parse the indented block
+        for (const auto& elem : result->pattern->definition->syntax) {
+            if (elem.is_param && elem.param_type == PatternParamType::Section) {
+                // Consume the newline after the pattern line
+                match(TokenType::NEWLINE);
+
+                // Parse the indented block and assign it to the section binding
+                auto blockStatements = parseBlock();
+                auto blockExpr = std::make_unique<BlockExpr>();
+                blockExpr->statements = std::move(blockStatements);
+                blockExpr->location = startToken.location;
+                call->bindings[elem.value] = std::move(blockExpr);
+                break;
+            }
+        }
+
         // Wrap in expression statement
         auto stmt = std::make_unique<ExpressionStmt>();
         stmt->expression = std::move(call);
@@ -313,6 +332,48 @@ StmtPtr Parser::functionDeclaration() {
 }
 
 ExprPtr Parser::expression() {
+    return logicalOr();
+}
+
+ExprPtr Parser::logicalOr() {
+    auto expr = logicalAnd();
+
+    while (match(TokenType::OR)) {
+        auto right = logicalAnd();
+        auto binary = std::make_unique<BinaryExpr>();
+        binary->left = std::move(expr);
+        binary->op = TokenType::OR;
+        binary->right = std::move(right);
+        expr = std::move(binary);
+    }
+
+    return expr;
+}
+
+ExprPtr Parser::logicalAnd() {
+    auto expr = logicalNot();
+
+    while (match(TokenType::AND)) {
+        auto right = logicalNot();
+        auto binary = std::make_unique<BinaryExpr>();
+        binary->left = std::move(expr);
+        binary->op = TokenType::AND;
+        binary->right = std::move(right);
+        expr = std::move(binary);
+    }
+
+    return expr;
+}
+
+ExprPtr Parser::logicalNot() {
+    if (match(TokenType::NOT)) {
+        auto operand = logicalNot();
+        auto unary = std::make_unique<UnaryExpr>();
+        unary->op = TokenType::NOT;
+        unary->operand = std::move(operand);
+        return unary;
+    }
+
     return equality();
 }
 
@@ -335,7 +396,8 @@ ExprPtr Parser::equality() {
 ExprPtr Parser::comparison() {
     auto expr = term();
 
-    while (match(TokenType::LESS) || match(TokenType::GREATER)) {
+    while (match(TokenType::LESS) || match(TokenType::GREATER) ||
+           match(TokenType::LESS_EQUAL) || match(TokenType::GREATER_EQUAL)) {
         TokenType op = previous_.type;
         auto right = term();
         auto binary = std::make_unique<BinaryExpr>();
@@ -365,11 +427,11 @@ ExprPtr Parser::term() {
 }
 
 ExprPtr Parser::factor() {
-    auto expr = primary();
+    auto expr = unary();
 
     while (match(TokenType::STAR) || match(TokenType::SLASH)) {
         TokenType op = previous_.type;
-        auto right = primary();
+        auto right = unary();
         auto binary = std::make_unique<BinaryExpr>();
         binary->left = std::move(expr);
         binary->op = op;
@@ -378,6 +440,18 @@ ExprPtr Parser::factor() {
     }
 
     return expr;
+}
+
+ExprPtr Parser::unary() {
+    if (match(TokenType::MINUS)) {
+        auto operand = unary();
+        auto unaryExpr = std::make_unique<UnaryExpr>();
+        unaryExpr->op = TokenType::MINUS;
+        unaryExpr->operand = std::move(operand);
+        return unaryExpr;
+    }
+
+    return primary();
 }
 
 ExprPtr Parser::primary() {
@@ -399,6 +473,16 @@ ExprPtr Parser::primary() {
         lit->value = std::get<std::string>(previous_.value);
         baseExpr = std::move(lit);
     }
+    else if (match(TokenType::TRUE)) {
+        auto lit = std::make_unique<BooleanLiteral>();
+        lit->value = true;
+        baseExpr = std::move(lit);
+    }
+    else if (match(TokenType::FALSE)) {
+        auto lit = std::make_unique<BooleanLiteral>();
+        lit->value = false;
+        baseExpr = std::move(lit);
+    }
     else if (match(TokenType::IDENTIFIER)) {
         auto id = std::make_unique<Identifier>();
         id->name = previous_.lexeme;
@@ -406,6 +490,9 @@ ExprPtr Parser::primary() {
     }
     else if (match(TokenType::AT)) {
         return intrinsicCall();
+    }
+    else if (match(TokenType::LBRACE)) {
+        return lazyExpression();
     }
     else if (match(TokenType::LPAREN)) {
         auto expr = expression();
@@ -416,7 +503,7 @@ ExprPtr Parser::primary() {
     else if (match(TokenType::A) || match(TokenType::AN) || match(TokenType::THE) ||
         match(TokenType::NEW) || match(TokenType::EACH) || match(TokenType::MEMBER) ||
         match(TokenType::OF) || match(TokenType::WITH) || match(TokenType::BY) ||
-        match(TokenType::RESULT)) {
+        match(TokenType::RESULT) || match(TokenType::SECTION)) {
         // These are natural language keywords - create identifier
         auto id = std::make_unique<Identifier>();
         id->name = previous_.lexeme;
@@ -746,6 +833,9 @@ StmtPtr Parser::effectDefinition() {
     // effect <syntax>:
     //     when triggered:
     //         ...
+    // OR (shorthand):
+    // effect <syntax>:
+    //     <statements>
 
     auto def = std::make_unique<PatternDef>();
 
@@ -754,24 +844,53 @@ StmtPtr Parser::effectDefinition() {
     consume(TokenType::COLON, "Expected ':' after effect syntax");
     match(TokenType::NEWLINE);
 
-    // Parse effect body
-    while (!check(TokenType::END_OF_FILE)) {
-        while (match(TokenType::NEWLINE)) {}
+    // Skip blank lines and check what comes next
+    while (match(TokenType::NEWLINE)) {}
 
-        if (check(TokenType::END_OF_FILE)) break;
+    if (check(TokenType::END_OF_FILE)) {
+        // Empty effect body
+        activeRegistry().registerFromDef(def.get());
+        return def;
+    }
 
-        bool atColumnOne = (current_.location.column == 1);
-        bool isTopLevelKeyword = check(TokenType::PATTERN) || check(TokenType::CLASS) ||
-            check(TokenType::EXPRESSION) || check(TokenType::EFFECT) ||
-            check(TokenType::FUNCTION) || check(TokenType::IMPORT) || check(TokenType::USE);
+    bool atColumnOne = (current_.location.column == 1);
+    bool isTopLevelKeyword = check(TokenType::PATTERN) || check(TokenType::CLASS) ||
+        check(TokenType::EXPRESSION) || check(TokenType::EFFECT) ||
+        check(TokenType::FUNCTION) || check(TokenType::IMPORT) || check(TokenType::USE);
 
-        if (atColumnOne && isTopLevelKeyword) break;
+    if (atColumnOne && isTopLevelKeyword) {
+        // No body, another top-level definition follows
+        activeRegistry().registerFromDef(def.get());
+        return def;
+    }
 
-        if (match(TokenType::WHEN)) {
-            if (match(TokenType::TRIGGERED)) {
-                consume(TokenType::COLON, "Expected ':' after 'when triggered'");
-                match(TokenType::NEWLINE);
-                def->when_triggered = parseBlock();
+    // Check if body starts with 'when triggered:' or if it's direct statements
+    if (check(TokenType::WHEN)) {
+        // Parse effect body with 'when triggered:' section
+        while (!check(TokenType::END_OF_FILE)) {
+            while (match(TokenType::NEWLINE)) {}
+
+            if (check(TokenType::END_OF_FILE)) break;
+
+            atColumnOne = (current_.location.column == 1);
+            isTopLevelKeyword = check(TokenType::PATTERN) || check(TokenType::CLASS) ||
+                check(TokenType::EXPRESSION) || check(TokenType::EFFECT) ||
+                check(TokenType::FUNCTION) || check(TokenType::IMPORT) || check(TokenType::USE);
+
+            if (atColumnOne && isTopLevelKeyword) break;
+
+            if (match(TokenType::WHEN)) {
+                if (match(TokenType::TRIGGERED)) {
+                    consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                    match(TokenType::NEWLINE);
+                    def->when_triggered = parseBlock();
+                }
+                else {
+                    while (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
+                        advance();
+                    }
+                    match(TokenType::NEWLINE);
+                }
             }
             else {
                 while (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
@@ -780,12 +899,10 @@ StmtPtr Parser::effectDefinition() {
                 match(TokenType::NEWLINE);
             }
         }
-        else {
-            while (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
-                advance();
-            }
-            match(TokenType::NEWLINE);
-        }
+    }
+    else {
+        // Shorthand syntax: direct statements are the when_triggered body
+        def->when_triggered = parseBlock();
     }
 
     // Register the pattern
@@ -1139,6 +1256,154 @@ std::vector<StmtPtr> Parser::parseBlockWithIndent(int baseIndent) {
     // Parse statements with proper indentation tracking
     // For now, delegate to parseBlock
     return parseBlock();
+}
+
+ExprPtr Parser::lazyExpression() {
+    // Parse lazy expression: {expression}
+    // We already consumed the opening brace
+    auto lazy = std::make_unique<LazyExpr>();
+    lazy->location = previous_.location;
+    lazy->inner = expression();
+    consume(TokenType::RBRACE, "Expected '}' after lazy expression");
+    return lazy;
+}
+
+StmtPtr Parser::sectionDefinition() {
+    // section <syntax>:
+    //     when triggered:
+    //         ...
+    // The section keyword creates a pattern that captures an indented block
+    // Syntax: section loop while {condition}:
+
+    auto def = std::make_unique<PatternDef>();
+
+    // Parse inline syntax until colon, handling {param} as lazy parameters
+    std::vector<PatternElement> elements;
+    bool seenFirstIdentifier = false;
+
+    while (!check(TokenType::COLON) && !check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
+        PatternElement elem;
+        elem.is_optional = false;
+        elem.param_type = PatternParamType::Normal;
+
+        // Check for lazy parameter syntax: {param}
+        if (match(TokenType::LBRACE)) {
+            // This is a lazy parameter
+            if (!check(TokenType::IDENTIFIER)) {
+                throw std::runtime_error("Expected parameter name after '{' in pattern syntax");
+            }
+            elem.is_param = true;
+            elem.value = current_.lexeme;
+            elem.param_type = PatternParamType::Lazy;
+            advance();  // consume parameter name
+            consume(TokenType::RBRACE, "Expected '}' after lazy parameter name");
+            elements.push_back(elem);
+            continue;
+        }
+
+        // Check for optional element syntax: [word]
+        if (match(TokenType::LBRACKET)) {
+            elem.is_optional = true;
+            std::string word = current_.lexeme;
+            elem.is_param = false;
+            elem.value = word;
+            advance();
+
+            if (!match(TokenType::RBRACKET)) {
+                throw std::runtime_error("Expected ']' after optional element");
+            }
+
+            elements.push_back(elem);
+            continue;
+        }
+
+        std::string word = current_.lexeme;
+        bool isReserved = reservedWords.count(word) > 0;
+
+        if (isReserved) {
+            elem.is_param = false;
+            elem.value = word;
+        }
+        else if (current_.type == TokenType::IDENTIFIER ||
+                 current_.type == TokenType::RESULT ||
+                 current_.type == TokenType::EFFECT ||
+                 current_.type == TokenType::GET ||
+                 current_.type == TokenType::PATTERNS) {
+            if (!seenFirstIdentifier) {
+                // First identifier is typically a pattern name (literal)
+                elem.is_param = false;
+                elem.value = word;
+                seenFirstIdentifier = true;
+            } else {
+                // Subsequent identifiers are parameters
+                elem.is_param = true;
+                elem.value = word;
+            }
+        }
+        else {
+            advance();
+            continue;
+        }
+
+        elements.push_back(elem);
+        advance();
+    }
+
+    // Add an implicit section parameter at the end to capture the indented block
+    PatternElement sectionParam;
+    sectionParam.is_param = true;
+    sectionParam.is_optional = false;
+    sectionParam.value = "section";
+    sectionParam.param_type = PatternParamType::Section;
+    elements.push_back(sectionParam);
+
+    def->syntax = elements;
+
+    consume(TokenType::COLON, "Expected ':' after section pattern syntax");
+    match(TokenType::NEWLINE);
+
+    // Parse section body (when triggered, etc.)
+    while (!check(TokenType::END_OF_FILE)) {
+        while (match(TokenType::NEWLINE)) {}
+
+        if (check(TokenType::END_OF_FILE)) break;
+
+        bool atColumnOne = (current_.location.column == 1);
+        bool isTopLevelKeyword = check(TokenType::PATTERN) || check(TokenType::CLASS) ||
+            check(TokenType::EXPRESSION) || check(TokenType::EFFECT) ||
+            check(TokenType::SECTION) || check(TokenType::FUNCTION) ||
+            check(TokenType::IMPORT) || check(TokenType::USE) ||
+            check(TokenType::PRINT) || check(TokenType::SET) ||
+            check(TokenType::IF) || check(TokenType::WHILE) ||
+            check(TokenType::IDENTIFIER);
+
+        if (atColumnOne && isTopLevelKeyword) break;
+
+        if (match(TokenType::WHEN)) {
+            if (match(TokenType::TRIGGERED)) {
+                consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                match(TokenType::NEWLINE);
+                def->when_triggered = parseBlock();
+            }
+            else {
+                while (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
+                    advance();
+                }
+                match(TokenType::NEWLINE);
+            }
+        }
+        else {
+            while (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_FILE)) {
+                advance();
+            }
+            match(TokenType::NEWLINE);
+        }
+    }
+
+    // Register the pattern
+    activeRegistry().registerFromDef(def.get());
+
+    return def;
 }
 
 } // namespace tbx

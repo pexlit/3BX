@@ -3,7 +3,7 @@
 
 namespace tbx {
 
-std::string type_to_string(Type type) {
+std::string typeToString(Type type) {
     switch (type) {
         case Type::VOID:     return "void";
         case Type::INTEGER:  return "integer";
@@ -17,7 +17,7 @@ std::string type_to_string(Type type) {
 }
 
 SemanticAnalyzer::SemanticAnalyzer() {
-    push_scope(); // Global scope
+    pushScope(); // Global scope
 }
 
 bool SemanticAnalyzer::analyze(Program& program) {
@@ -25,11 +25,11 @@ bool SemanticAnalyzer::analyze(Program& program) {
     return errors_.empty();
 }
 
-void SemanticAnalyzer::push_scope() {
+void SemanticAnalyzer::pushScope() {
     scopes_.emplace_back();
 }
 
-void SemanticAnalyzer::pop_scope() {
+void SemanticAnalyzer::popScope() {
     scopes_.pop_back();
 }
 
@@ -66,6 +66,22 @@ void SemanticAnalyzer::visit(StringLiteral& node) {
     last_type_ = Type::STRING;
 }
 
+void SemanticAnalyzer::visit(BooleanLiteral& node) {
+    (void)node;
+    last_type_ = Type::BOOLEAN;
+}
+
+void SemanticAnalyzer::visit(UnaryExpr& node) {
+    node.operand->accept(*this);
+    // For now, unary expressions preserve the type of their operand
+    // except for 'not' which produces a boolean
+    if (node.op == TokenType::MINUS) {
+        // Negation preserves numeric type
+    } else if (node.op == TokenType::NOT) {
+        last_type_ = Type::BOOLEAN;
+    }
+}
+
 void SemanticAnalyzer::visit(Identifier& node) {
     // Reserved words in natural language expressions are not variables
     if (PatternRegistry::isReservedWord(node.name)) {
@@ -89,9 +105,17 @@ void SemanticAnalyzer::visit(BinaryExpr& node) {
     node.right->accept(*this);
     Type right_type = last_type_;
 
-    // Basic type checking
+    // Check if types are numeric (INTEGER or FLOAT)
+    auto isNumeric = [](Type t) {
+        return t == Type::INTEGER || t == Type::FLOAT;
+    };
+
+    // Check type compatibility
     if (left_type != right_type && left_type != Type::UNKNOWN && right_type != Type::UNKNOWN) {
-        error("Type mismatch in binary expression");
+        // Allow numeric type mixing (int + float -> float)
+        if (!isNumeric(left_type) || !isNumeric(right_type)) {
+            error("Type mismatch in binary expression");
+        }
     }
 
     // Result type depends on operator
@@ -100,10 +124,21 @@ void SemanticAnalyzer::visit(BinaryExpr& node) {
         case TokenType::NOT_EQUALS:
         case TokenType::LESS:
         case TokenType::GREATER:
+        case TokenType::LESS_EQUAL:
+        case TokenType::GREATER_EQUAL:
+            last_type_ = Type::BOOLEAN;
+            break;
+        case TokenType::AND:
+        case TokenType::OR:
             last_type_ = Type::BOOLEAN;
             break;
         default:
-            last_type_ = left_type;
+            // For arithmetic operators, promote to FLOAT if either operand is FLOAT
+            if (left_type == Type::FLOAT || right_type == Type::FLOAT) {
+                last_type_ = Type::FLOAT;
+            } else {
+                last_type_ = left_type;
+            }
     }
 }
 
@@ -112,6 +147,27 @@ void SemanticAnalyzer::visit(NaturalExpr& node) {
     // through pattern matching. For now, treat as unknown type.
     (void)node;
     last_type_ = Type::UNKNOWN;
+}
+
+void SemanticAnalyzer::visit(LazyExpr& node) {
+    // Lazy expressions wrap another expression for deferred evaluation.
+    // Analyze the inner expression but the result is not evaluated yet.
+    if (node.inner) {
+        node.inner->accept(*this);
+    }
+    // The type of a lazy expression is unknown until evaluated
+    last_type_ = Type::UNKNOWN;
+}
+
+void SemanticAnalyzer::visit(BlockExpr& node) {
+    // Block expressions capture statements for deferred execution.
+    // Analyze all statements in the block.
+    pushScope();
+    for (auto& stmt : node.statements) {
+        stmt->accept(*this);
+    }
+    popScope();
+    last_type_ = Type::VOID;
 }
 
 void SemanticAnalyzer::visit(ExpressionStmt& node) {
@@ -138,42 +194,42 @@ void SemanticAnalyzer::visit(SetStatement& node) {
 void SemanticAnalyzer::visit(IfStatement& node) {
     node.condition->accept(*this);
 
-    push_scope();
+    pushScope();
     for (auto& stmt : node.then_branch) {
         stmt->accept(*this);
     }
-    pop_scope();
+    popScope();
 
     if (!node.else_branch.empty()) {
-        push_scope();
+        pushScope();
         for (auto& stmt : node.else_branch) {
             stmt->accept(*this);
         }
-        pop_scope();
+        popScope();
     }
 }
 
 void SemanticAnalyzer::visit(WhileStatement& node) {
     node.condition->accept(*this);
 
-    push_scope();
+    pushScope();
     for (auto& stmt : node.body) {
         stmt->accept(*this);
     }
-    pop_scope();
+    popScope();
 }
 
 void SemanticAnalyzer::visit(FunctionDecl& node) {
     define(node.name, Type::FUNCTION, false);
 
-    push_scope();
+    pushScope();
     for (const auto& param : node.params) {
         define(param, Type::UNKNOWN);
     }
     for (auto& stmt : node.body) {
         stmt->accept(*this);
     }
-    pop_scope();
+    popScope();
 }
 
 void SemanticAnalyzer::visit(IntrinsicCall& node) {

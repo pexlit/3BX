@@ -47,24 +47,24 @@ type:
 # Type checking
 expression value is a typeName:
     get:
-        @intrinsic("type_check", value, typeName)
+        return @intrinsic("type_check", value, typeName)
 
 expression value is an typeName:
     get:
-        @intrinsic("type_check", value, typeName)
+        return @intrinsic("type_check", value, typeName)
 
 expression type of value:
     get:
-        @intrinsic("get_type", value)
+        return @intrinsic("get_type", value)
 
 # Type casting
 expression value as typeName:
     get:
-        @intrinsic("cast", value, typeName)
+        return @intrinsic("cast", value, typeName)
 
 expression convert value to typeName:
     get:
-        @intrinsic("cast", value, typeName)
+        return @intrinsic("cast", value, typeName)
 
 # Optional types
 type:

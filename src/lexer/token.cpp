@@ -2,7 +2,7 @@
 
 namespace tbx {
 
-std::string token_type_to_string(TokenType type) {
+std::string tokenTypeToString(TokenType type) {
     switch (type) {
         case TokenType::INTEGER:     return "INTEGER";
         case TokenType::FLOAT:       return "FLOAT";

@@ -15,15 +15,8 @@ BUILD_DIR="$SCRIPT_DIR/build"
 SOURCE_FILE="$1"
 IR_FILE="/tmp/3bx_output.ll"
 
-# Build the compiler if needed
-if [ ! -f "$BUILD_DIR/3bx" ]; then
-    echo "Building 3bx compiler..."
-    mkdir -p "$BUILD_DIR"
-    cd "$BUILD_DIR"
-    cmake ..
-    make -j$(nproc)
-    cd "$SCRIPT_DIR"
-fi
+# Build the compiler
+"$SCRIPT_DIR/build.sh"
 
 # Check if source file exists
 if [ ! -f "$SOURCE_FILE" ]; then

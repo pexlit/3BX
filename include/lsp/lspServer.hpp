@@ -42,6 +42,19 @@ struct TextDocument {
     int version{};
 };
 
+// Represents a location in source code for go-to-definition
+struct LspLocation {
+    std::string uri;
+    LspRange range;
+};
+
+// Represents a pattern definition with its location
+struct PatternDefLocation {
+    std::string syntax;              // The pattern syntax string (e.g., "set var to val")
+    std::vector<std::string> words;  // Words in the pattern (for matching)
+    LspLocation location;            // Where the pattern is defined
+};
+
 // Simple JSON value type for LSP communication
 class JsonValue {
 public:
@@ -126,6 +139,9 @@ private:
     std::unordered_map<std::string, TextDocument> documents_;
     std::unique_ptr<PatternRegistry> registry_;
 
+    // Pattern definitions indexed by document URI
+    std::unordered_map<std::string, std::vector<PatternDefLocation>> patternDefinitions_;
+
     // Message handling
     JsonValue handleRequest(const std::string& method, const JsonValue& params, const JsonValue& id);
     void handleNotification(const std::string& method, const JsonValue& params);
@@ -144,6 +160,7 @@ private:
     // Language features
     JsonValue handleCompletion(const JsonValue& params);
     JsonValue handleHover(const JsonValue& params);
+    JsonValue handleDefinition(const JsonValue& params);
 
     // Diagnostics
     void publishDiagnostics(const std::string& uri, const std::string& content);
@@ -162,6 +179,12 @@ private:
     // Utility
     std::string uriToPath(const std::string& uri);
     std::string pathToUri(const std::string& path);
+
+    // Pattern definition tracking
+    void extractPatternDefinitions(const std::string& uri, const std::string& content);
+    void processImports(const std::string& uri, const std::string& content);
+    std::string resolveImportPath(const std::string& importPath, const std::string& sourceDir);
+    PatternDefLocation* findPatternAtPosition(const std::string& uri, int line, int character);
 };
 
 } // namespace tbx

@@ -1,7 +1,7 @@
 {
   "name": "3bx",
   "displayName": "3BX Language Support",
-  "description": "Language support for the 3BX programming language - syntax highlighting, LSP integration, and more",
+  "description": "Language support for the 3BX programming language - syntax highlighting, LSP integration, debugging, and more",
   "version": "0.1.0",
   "publisher": "3bx-lang",
   "license": "MIT",
@@ -13,16 +13,20 @@
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers",
+    "Themes"
   ],
   "keywords": [
     "3bx",
     "programming language",
     "natural language",
-    "pattern matching"
+    "pattern matching",
+    "debugger"
   ],
   "activationEvents": [
-    "onLanguage:3bx"
+    "onLanguage:3bx",
+    "workspaceContains:**/*.3bx"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -56,6 +60,18 @@
         "path": "./snippets/3bx.json"
       }
     ],
+    "themes": [
+      {
+        "label": "3BX Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/3bx-dark.json"
+      },
+      {
+        "label": "3BX Colorful",
+        "uiTheme": "vs-dark",
+        "path": "./themes/3bx-colorful.json"
+      }
+    ],
     "configuration": {
       "title": "3BX",
       "properties": {
@@ -78,6 +94,11 @@
           ],
           "default": "off",
           "description": "Traces the communication between VS Code and the 3BX language server"
+        },
+        "3bx.debug.verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose debug adapter logging"
         }
       }
     },
@@ -89,16 +110,80 @@
       {
         "command": "3bx.compileFile",
         "title": "3BX: Compile Current File"
+      },
+      {
+        "command": "3bx.showLogs",
+        "title": "3BX: Show Extension Logs"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "3bx"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "3bx",
+        "label": "3BX Debug",
+        "program": "./out/extension.js",
+        "languages": ["3bx"],
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the 3BX program to debug",
+                "default": "${file}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop execution on the first line",
+                "default": false
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable debug adapter logging",
+                "default": false
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "3bx",
+            "request": "launch",
+            "name": "Debug 3BX Program",
+            "program": "${file}",
+            "stopOnEntry": false
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "3BX: Launch Program",
+            "description": "Launch and debug a 3BX program",
+            "body": {
+              "type": "3bx",
+              "request": "launch",
+              "name": "Debug ${1:Program}",
+              "program": "^\"\\${workspaceFolder}/${2:main.3bx}\"",
+              "stopOnEntry": false
+            }
+          }
+        ]
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run esbuild-base -- --production",
+    "esbuild-base": "node esbuild.js",
+    "esbuild": "npm run esbuild-base",
+    "esbuild-watch": "npm run esbuild-base -- --watch",
+    "compile": "npm run esbuild",
+    "watch": "npm run esbuild-watch",
     "pretest": "npm run compile",
     "lint": "eslint src --ext ts",
-    "package": "vsce package"
+    "package": "npm run esbuild-base -- --production && vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -108,6 +193,7 @@
     "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
+    "esbuild": "^0.24.0",
     "eslint": "^8.55.0",
     "typescript": "^5.3.0",
     "@vscode/vsce": "^2.22.0"

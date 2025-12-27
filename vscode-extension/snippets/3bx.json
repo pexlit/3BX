@@ -1,5 +1,52 @@
 {
-  "Pattern Definition": {
+  "Effect Pattern": {
+    "prefix": "effect",
+    "body": [
+      "effect ${1:pattern syntax}:",
+      "\twhen triggered:",
+      "\t\t${2:@intrinsic(\"print\", \"Hello\")}"
+    ],
+    "description": "Define an effect pattern (side effects, no return value)"
+  },
+  "Expression Pattern": {
+    "prefix": "expression",
+    "body": [
+      "expression ${1:pattern syntax}:",
+      "\tget:",
+      "\t\t${2:@intrinsic(\"add\", a, b)}"
+    ],
+    "description": "Define an expression pattern (returns a value)"
+  },
+  "Expression Pattern with Setter": {
+    "prefix": "expressionset",
+    "body": [
+      "expression ${1:pattern syntax}:",
+      "\tget:",
+      "\t\t${2:@intrinsic(\"load\", var)}",
+      "\tset:",
+      "\t\t${3:@intrinsic(\"store\", var, value)}"
+    ],
+    "description": "Define an expression pattern with both getter and setter"
+  },
+  "Section Pattern": {
+    "prefix": "section",
+    "body": [
+      "section ${1:pattern syntax}:",
+      "\twhen triggered:",
+      "\t\t${2:@intrinsic(\"execute\", section)}"
+    ],
+    "description": "Define a section pattern (block with indented code)"
+  },
+  "Condition Pattern": {
+    "prefix": "condition",
+    "body": [
+      "condition ${1:pattern syntax}:",
+      "\twhen triggered:",
+      "\t\t${2:@intrinsic(\"branch\", cond)}"
+    ],
+    "description": "Define a condition pattern"
+  },
+  "Legacy Pattern Definition": {
     "prefix": "pattern",
     "body": [
       "pattern:",
@@ -7,7 +54,7 @@
       "\twhen triggered:",
       "\t\t${2:@intrinsic(\"print\", \"Hello\")}"
     ],
-    "description": "Define a new pattern with syntax and trigger behavior"
+    "description": "Define a new pattern with legacy syntax"
   },
   "Pattern with Priority": {
     "prefix": "patternp",
@@ -40,42 +87,44 @@
   "If Statement": {
     "prefix": "if",
     "body": [
-      "if ${1:condition} then",
+      "if {${1:condition}}:",
       "\t${2:body}"
     ],
-    "description": "If-then statement"
-  },
-  "If-Else Statement": {
-    "prefix": "ifelse",
-    "body": [
-      "if ${1:condition} then",
-      "\t${2:then_body}",
-      "else",
-      "\t${3:else_body}"
-    ],
-    "description": "If-then-else statement"
+    "description": "If statement with lazy condition"
   },
   "While Loop": {
     "prefix": "while",
     "body": [
-      "while ${1:condition} loop",
+      "loop while {${1:condition}}:",
       "\t${2:body}"
     ],
-    "description": "While loop"
+    "description": "While loop with lazy condition"
   },
-  "Function Definition": {
-    "prefix": "function",
+  "Loop N Times": {
+    "prefix": "loop",
     "body": [
-      "function ${1:name}:",
-      "\t${2:body}",
-      "\treturn ${3:value}"
+      "loop ${1:5} times:",
+      "\t${2:body}"
     ],
-    "description": "Define a function"
+    "description": "Loop a fixed number of times"
+  },
+  "Loop From To": {
+    "prefix": "loopfrom",
+    "body": [
+      "loop from ${1:0} to ${2:10}:",
+      "\t${3:body}"
+    ],
+    "description": "Loop from start to end value"
   },
   "Import": {
     "prefix": "import",
-    "body": "import ${1:module}",
-    "description": "Import a module"
+    "body": "import ${1:lib/prelude.3bx}",
+    "description": "Import a library file"
+  },
+  "Intrinsic Call": {
+    "prefix": "@intrinsic",
+    "body": "@intrinsic(\"${1:operation}\", ${2:args})",
+    "description": "Call an intrinsic operation"
   },
   "Intrinsic Print": {
     "prefix": "@print",
@@ -112,17 +161,43 @@
     "body": "@intrinsic(\"div\", ${1:a}, ${2:b})",
     "description": "Divide two values"
   },
+  "Intrinsic FFI Call": {
+    "prefix": "@call",
+    "body": "@intrinsic(\"call\", \"${1:library}\", \"${2:function}\", ${3:args})",
+    "description": "Call an external function via FFI"
+  },
+  "Intrinsic Evaluate": {
+    "prefix": "@evaluate",
+    "body": "@intrinsic(\"evaluate\", ${1:lazyExpression})",
+    "description": "Evaluate a lazy expression"
+  },
+  "Intrinsic Execute": {
+    "prefix": "@execute",
+    "body": "@intrinsic(\"execute\", section)",
+    "description": "Execute a section block"
+  },
+  "Lazy Expression": {
+    "prefix": "lazy",
+    "body": "{${1:expression}}",
+    "description": "Create a lazy expression (evaluated on demand)"
+  },
+  "Print Statement": {
+    "prefix": "print",
+    "body": "print ${1:value}",
+    "description": "Print a value to the console"
+  },
   "Comment": {
     "prefix": "#",
     "body": "# ${1:comment}",
     "description": "Single line comment"
   },
-  "Section Header": {
-    "prefix": "section",
+  "Comment Block": {
+    "prefix": "##",
     "body": [
-      "${1:section_name}:",
-      "\t${2:content}"
+      "# ============================================================",
+      "# ${1:Section Title}",
+      "# ============================================================"
     ],
-    "description": "Create a section with a header"
+    "description": "Comment block for section headers"
   }
 }

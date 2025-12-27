@@ -3,6 +3,7 @@
 #include "semantic/semantic.hpp"
 #include "codegen/codegen.hpp"
 #include "lsp/lspServer.hpp"
+#include "dap/dapServer.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -10,16 +11,24 @@
 #include <set>
 #include <filesystem>
 
+// LLVM JIT includes
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/Error.h>
+
 namespace fs = std::filesystem;
 
 void printUsage(const char* program) {
     std::cerr << "Usage: " << program << " <source_file.3bx>\n";
     std::cerr << "       " << program << " --emit-ir <source_file.3bx>\n";
     std::cerr << "       " << program << " --lsp [--debug]\n";
+    std::cerr << "       " << program << " --dap [--debug]\n";
     std::cerr << "\nOptions:\n";
     std::cerr << "  --emit-ir    Output LLVM IR instead of compiling\n";
     std::cerr << "  --lsp        Start Language Server Protocol mode\n";
-    std::cerr << "  --debug      Enable debug logging (with --lsp)\n";
+    std::cerr << "  --dap        Start Debug Adapter Protocol mode\n";
+    std::cerr << "  --debug      Enable debug logging (with --lsp or --dap)\n";
 }
 
 std::string readFile(const std::string& path) {
@@ -83,6 +92,95 @@ std::string resolveImport(const std::string& importPath, const std::string& sour
     return importPath;
 }
 
+// Extract import paths from a file using lightweight lexing
+std::vector<std::string> extractImports(const std::string& source, const std::string& filePath) {
+    std::vector<std::string> imports;
+    tbx::Lexer lexer(source, filePath);
+
+    while (true) {
+        auto token = lexer.nextToken();
+        if (token.type == tbx::TokenType::END_OF_FILE) break;
+
+        if (token.type == tbx::TokenType::IMPORT) {
+            // Check if next token is FUNCTION (skip import function declarations)
+            auto next = lexer.peek();
+            if (next.type == tbx::TokenType::FUNCTION) {
+                continue;
+            }
+
+            // Collect import path
+            std::string path;
+            while (true) {
+                auto pathToken = lexer.nextToken();
+                if (pathToken.type == tbx::TokenType::NEWLINE ||
+                    pathToken.type == tbx::TokenType::END_OF_FILE) {
+                    break;
+                }
+                path += pathToken.lexeme;
+            }
+            if (!path.empty()) {
+                imports.push_back(path);
+            }
+        }
+        else if (token.type == tbx::TokenType::USE) {
+            // use <name> from <path>
+            // Skip to 'from'
+            while (true) {
+                auto t = lexer.nextToken();
+                if (t.type == tbx::TokenType::FROM) {
+                    break;
+                }
+                if (t.type == tbx::TokenType::NEWLINE ||
+                    t.type == tbx::TokenType::END_OF_FILE) {
+                    break;
+                }
+            }
+            // Collect path after 'from'
+            std::string path;
+            while (true) {
+                auto pathToken = lexer.nextToken();
+                if (pathToken.type == tbx::TokenType::NEWLINE ||
+                    pathToken.type == tbx::TokenType::END_OF_FILE) {
+                    break;
+                }
+                path += pathToken.lexeme;
+            }
+            if (!path.empty()) {
+                imports.push_back(path);
+            }
+        }
+    }
+    return imports;
+}
+
+// Phase 1: Collect all files and their imports (depth-first)
+void collectFiles(
+    const std::string& filePath,
+    std::set<std::string>& visitedFiles,
+    std::vector<std::string>& orderedFiles
+) {
+    fs::path canonical = fs::weakly_canonical(filePath);
+    std::string canonicalPath = canonical.string();
+
+    if (visitedFiles.count(canonicalPath)) {
+        return;
+    }
+    visitedFiles.insert(canonicalPath);
+
+    // Read and extract imports
+    std::string source = readFile(filePath);
+    auto imports = extractImports(source, filePath);
+
+    // Process imports first (depth-first)
+    for (const auto& importPath : imports) {
+        std::string resolved = resolveImport(importPath, filePath);
+        collectFiles(resolved, visitedFiles, orderedFiles);
+    }
+
+    // Add this file after its imports
+    orderedFiles.push_back(canonicalPath);
+}
+
 // Parse a file and collect its imports recursively
 // Uses shared registry to accumulate patterns across files
 void parseWithImports(
@@ -92,44 +190,70 @@ void parseWithImports(
     tbx::PatternRegistry& sharedRegistry,
     const std::string& originalSource
 ) {
-    // Avoid parsing the same file twice (circular import prevention)
-    fs::path canonical = fs::weakly_canonical(filePath);
-    std::string canonicalPath = canonical.string();
+    // Phase 1: Collect all files in dependency order (imports first)
+    std::set<std::string> visitedFiles;
+    std::vector<std::string> orderedFiles;
+    collectFiles(filePath, visitedFiles, orderedFiles);
 
-    if (parsedFiles.count(canonicalPath)) {
-        return;
-    }
-    parsedFiles.insert(canonicalPath);
+    // Phase 2: Parse files in order (imports first, so patterns are available)
+    for (const auto& file : orderedFiles) {
+        if (parsedFiles.count(file)) {
+            continue;
+        }
+        parsedFiles.insert(file);
 
-    // Read and parse the file
-    std::string source = readFile(filePath);
-    tbx::Lexer lexer(source, filePath);
-    tbx::Parser parser(lexer);
+        // Read and parse the file
+        std::string source = readFile(file);
+        tbx::Lexer lexer(source, file);
+        tbx::Parser parser(lexer);
 
-    // Use shared registry so patterns from imports are available
-    parser.setSharedRegistry(&sharedRegistry);
+        // Use shared registry so patterns are accumulated
+        parser.setSharedRegistry(&sharedRegistry);
 
-    auto program = parser.parse();
+        auto program = parser.parse();
 
-    // Process imports first (depth-first)
-    // This ensures patterns from imports are registered before they're used
-    for (auto& stmt : program->statements) {
-        if (auto* importStmt = dynamic_cast<tbx::ImportStmt*>(stmt.get())) {
-            std::string resolved = resolveImport(importStmt->module_path, filePath);
-            parseWithImports(resolved, parsedFiles, allStatements, sharedRegistry, originalSource);
-        } else if (auto* useStmt = dynamic_cast<tbx::UseStmt*>(stmt.get())) {
-            std::string resolved = resolveImport(useStmt->module_path, filePath);
-            parseWithImports(resolved, parsedFiles, allStatements, sharedRegistry, originalSource);
+        // Add non-import statements to the collection
+        for (auto& stmt : program->statements) {
+            if (!dynamic_cast<tbx::ImportStmt*>(stmt.get()) &&
+                !dynamic_cast<tbx::UseStmt*>(stmt.get())) {
+                allStatements.push_back(std::move(stmt));
+            }
         }
     }
+}
 
-    // Add non-import statements to the collection
-    for (auto& stmt : program->statements) {
-        if (!dynamic_cast<tbx::ImportStmt*>(stmt.get()) &&
-            !dynamic_cast<tbx::UseStmt*>(stmt.get())) {
-            allStatements.push_back(std::move(stmt));
-        }
+// Run the compiled module using LLVM ORC JIT
+int runJit(std::unique_ptr<llvm::LLVMContext> context, std::unique_ptr<llvm::Module> module) {
+    // Initialize native target
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+
+    // Create JIT
+    auto jitExpected = llvm::orc::LLJITBuilder().create();
+    if (!jitExpected) {
+        std::cerr << "Error creating JIT: " << llvm::toString(jitExpected.takeError()) << "\n";
+        return 1;
     }
+    auto jit = std::move(*jitExpected);
+
+    // Add the module to JIT
+    auto tsm = llvm::orc::ThreadSafeModule(std::move(module), std::move(context));
+    if (auto err = jit->addIRModule(std::move(tsm))) {
+        std::cerr << "Error adding module to JIT: " << llvm::toString(std::move(err)) << "\n";
+        return 1;
+    }
+
+    // Look up the main function
+    auto mainSymbol = jit->lookup("main");
+    if (!mainSymbol) {
+        std::cerr << "Error looking up main: " << llvm::toString(mainSymbol.takeError()) << "\n";
+        return 1;
+    }
+
+    // Get the function pointer and call it
+    auto* mainFn = mainSymbol->toPtr<int()>();
+    return mainFn();
 }
 
 int main(int argc, char* argv[]) {
@@ -140,6 +264,7 @@ int main(int argc, char* argv[]) {
 
     bool emitIr = false;
     bool lspMode = false;
+    bool dapMode = false;
     bool debugMode = false;
     std::string sourceFile;
 
@@ -149,6 +274,8 @@ int main(int argc, char* argv[]) {
             emitIr = true;
         } else if (arg == "--lsp") {
             lspMode = true;
+        } else if (arg == "--dap") {
+            dapMode = true;
         } else if (arg == "--debug") {
             debugMode = true;
         } else if (arg == "--help" || arg == "-h") {
@@ -162,6 +289,14 @@ int main(int argc, char* argv[]) {
     // Handle LSP mode
     if (lspMode) {
         tbx::LspServer server;
+        server.setDebug(debugMode);
+        server.run();
+        return 0;
+    }
+
+    // Handle DAP mode
+    if (dapMode) {
+        tbx::DapServer server;
         server.setDebug(debugMode);
         server.run();
         return 0;
@@ -196,17 +331,21 @@ int main(int argc, char* argv[]) {
 
         // Code generation
         tbx::CodeGenerator codegen(sourceFile);
+        codegen.setPatternRegistry(&sharedRegistry);
         if (!codegen.generate(*program)) {
             std::cerr << "Error: Code generation failed\n";
             return 1;
         }
 
         if (emitIr) {
-            codegen.get_module()->print(llvm::outs(), nullptr);
+            codegen.getModule()->print(llvm::outs(), nullptr);
+            return 0;
         }
 
-        std::cerr << "Compilation successful.\n";
-        return 0;
+        // Run the compiled code using JIT
+        auto context = codegen.takeContext();
+        auto module = codegen.takeModule();
+        return runJit(std::move(context), std::move(module));
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

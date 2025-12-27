@@ -14,7 +14,7 @@ public:
     std::vector<Token> tokenize();
 
     // Get next token
-    Token next_token();
+    Token nextToken();
 
     // Peek at next token without consuming
     Token peek();
@@ -31,13 +31,13 @@ private:
 
     char current() const;
     char advance();
-    bool at_end() const;
-    void skip_whitespace();
+    bool atEnd() const;
+    void skipWhitespace();
 
-    Token make_token(TokenType type, const std::string& lexeme);
-    Token scan_string();
-    Token scan_number();
-    Token scan_identifier();
+    Token makeToken(TokenType type, const std::string& lexeme);
+    Token scanString();
+    Token scanNumber();
+    Token scanIdentifier();
 };
 
 } // namespace tbx

@@ -1,0 +1,13 @@
+{
+  "general": {
+    "previewFeatures": true
+  },
+  "context.includeDirectories": [
+    "."
+  ],
+  "context": {
+    "fileFiltering": {
+      "respectGitIgnore": false
+    }
+  }
+}

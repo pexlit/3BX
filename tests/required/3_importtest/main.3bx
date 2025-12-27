@@ -1,1 +1,11 @@
+#this test tests circular imports
 import other.3bx
+
+effect first:
+	print "printing from main.3bx"
+
+# we call third, which calls second, which calls first, which prints the message.
+effect third:
+	second
+
+third

@@ -17,35 +17,69 @@ effect write msg to the console:
 
 expression left + right:
     get:
-        @intrinsic("add", left, right)
+        return @intrinsic("add", left, right)
 
 expression left - right:
     get:
-        @intrinsic("sub", left, right)
+        return @intrinsic("sub", left, right)
 
 expression left * right:
     get:
-        @intrinsic("mul", left, right)
+        return @intrinsic("mul", left, right)
 
 expression left / right:
     get:
-        @intrinsic("div", left, right)
+        return @intrinsic("div", left, right)
 
 # === Comparison ===
 
-expression val1 is equal to val2:
+expression:
+    patterns:
+        val1 is equal to val2
+        val1 = val2
     get:
-        @intrinsic("cmp_eq", val1, val2)
+        return @intrinsic("cmp_eq", val1, val2)
 
-expression val1 is less than val2:
+expression:
+    patterns:
+        val1 is less than val2
+        val1 < val2
     get:
-        @intrinsic("cmp_lt", val1, val2)
+        return @intrinsic("cmp_lt", val1, val2)
 
-expression val1 is greater than val2:
+expression:
+    patterns:
+        val1 is greater than val2
+        val1 > val2
     get:
-        @intrinsic("cmp_gt", val1, val2)
+        return @intrinsic("cmp_gt", val1, val2)
+
+expression:
+    patterns:
+        val1 is less than or equal to val2
+        val1 <= val2
+    get:
+        return @intrinsic("cmp_lte", val1, val2)
+
+expression:
+    patterns:
+        val1 is greater than or equal to val2
+        val1 >= val2
+    get:
+        return @intrinsic("cmp_gte", val1, val2)
+
+expression:
+    patterns:
+        val1 is not equal to val2
+        val1 != val2
+    get:
+        return @intrinsic("cmp_neq", val1, val2)
 
 # === Control Flow ===
+
+condition if cond:
+    when triggered:
+        @intrinsic("branch", cond)
 
 condition if cond then:
     when triggered:

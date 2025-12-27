@@ -18,7 +18,7 @@ enum class Type {
     UNKNOWN
 };
 
-std::string type_to_string(Type type);
+std::string typeToString(Type type);
 
 // Symbol table entry
 struct Symbol {
@@ -43,8 +43,12 @@ public:
     void visit(FloatLiteral& node) override;
     void visit(StringLiteral& node) override;
     void visit(Identifier& node) override;
+    void visit(BooleanLiteral& node) override;
+    void visit(UnaryExpr& node) override;
     void visit(BinaryExpr& node) override;
     void visit(NaturalExpr& node) override;
+    void visit(LazyExpr& node) override;
+    void visit(BlockExpr& node) override;
     void visit(ExpressionStmt& node) override;
     void visit(SetStatement& node) override;
     void visit(IfStatement& node) override;
@@ -63,8 +67,8 @@ private:
     std::vector<std::string> errors_;
     Type last_type_ = Type::UNKNOWN;
 
-    void push_scope();
-    void pop_scope();
+    void pushScope();
+    void popScope();
     void define(const std::string& name, Type type, bool mutable_ = true);
     Symbol* lookup(const std::string& name);
     void error(const std::string& message);

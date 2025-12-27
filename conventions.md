@@ -5,6 +5,13 @@ conventions:
 ## proper function names
 describe what it does. don't give any unnecessary information about inner workings or what it's needed for. you never know if it might be used for something else.
 
+bad:
+do not abbreviate names except if they're used a lot and it's obvious what it means.
+bad:
+for(int i = 0; i < 100; i++){}
+good:
+for(int cellIndex = 0; cellIndex < 100; cellIndex++){}
+
 ## DRY
 
 ## keep it as simple as possible
@@ -15,6 +22,10 @@ void setFrameRate(int frameRate){
 }
 
 it just adds complexity and increases compile time. we can easily change this into a function when the time comes that something else needs to update when framerate changes.
+
+## use enums
+
+int state = 0; is bad. use enums!
 
 # PHP
 functions: snake_case
@@ -47,20 +58,3 @@ to exit an outer loop without needing to set data, just use a label and goto. it
 functions: camelCase
 classes: PascalCase
 files: snake_case
-
-# any language
-
-## proper function names
-describe what it does. don't give any unnecessary information about inner workings or what it's needed for. you never know if it might be used for something else.
-bad:
-do not abbreviate names except if they're used a lot and it's obvious what it means.
-bad:
-for(int i = 0; i < 100; i++){}
-good:
-for(int cellIndex = 0; cellIndex < 100; cellIndex++){}
-
-## use enums
-
-int state = 0; is bad. use enums!
-
-## DRY

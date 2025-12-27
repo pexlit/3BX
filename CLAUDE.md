@@ -17,6 +17,13 @@
 - **Patterns**: User-definable syntax patterns for extensibility
 - **Target**: General-purpose programming
 
+## Agent Delegation Strategy
+
+- **Always delegate implementation tasks to agents** - Do not implement features directly; spawn specialized agents to do the work
+- **Reuse agents for related tasks** - When a task relates to previous work, resume the agent that worked on it using the agent ID
+- **Run agents in parallel** - When tasks are independent, spawn multiple agents simultaneously
+- **Match agent to task** - Use the appropriate agent type based on the files and domain involved
+
 ## Agent Roles
 
 Specialized agents work on different compiler components:
@@ -107,7 +114,6 @@ Specialized agents work on different compiler components:
 - Use `snake_case` for functions and variables
 - Use `PascalCase` for classes and types
 - Header files in `include/`, implementation in `src/`
-- Every public function needs a brief comment
 - Use LLVM coding conventions where applicable
 
 ## Build Commands

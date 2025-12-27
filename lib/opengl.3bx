@@ -8,67 +8,67 @@
 # Clear buffer bits
 expression GL_COLOR_BUFFER_BIT:
     get:
-        set result to 16384
+        return 16384
 
 expression GL_DEPTH_BUFFER_BIT:
     get:
-        set result to 256
+        return 256
 
 expression GL_STENCIL_BUFFER_BIT:
     get:
-        set result to 1024
+        return 1024
 
 # Primitive types
 expression GL_POINTS:
     get:
-        set result to 0
+        return 0
 
 expression GL_LINES:
     get:
-        set result to 1
+        return 1
 
 expression GL_TRIANGLES:
     get:
-        set result to 4
+        return 4
 
 expression GL_QUADS:
     get:
-        set result to 7
+        return 7
 
 expression GL_POLYGON:
     get:
-        set result to 9
+        return 9
 
 # Matrix modes
 expression GL_MODELVIEW:
     get:
-        set result to 5888
+        return 5888
 
 expression GL_PROJECTION:
     get:
-        set result to 5889
+        return 5889
 
 # Enable/disable capabilities
 expression GL_BLEND:
     get:
-        set result to 3042
+        return 3042
 
 expression GL_DEPTH_TEST:
     get:
-        set result to 2929
+        return 2929
 
 expression GL_TEXTURE_2D:
     get:
-        set result to 3553
+        return 3553
 
 # Blend functions
 expression GL_SRC_ALPHA:
     get:
-        set result to 770
+        return 770
 
 expression GL_ONE_MINUS_SRC_ALPHA:
     get:
-        set result to 771
+        return 771
 
 # ============================================================
 # Natural Language Wrappers - Window Management
@@ -112,11 +112,11 @@ effect disable vsync:
 
 expression window w should close:
     get:
-        set result to @intrinsic("call", "glfw3", "glfwWindowShouldClose", w)
+        return @intrinsic("call", "glfw3", "glfwWindowShouldClose", w)
 
 expression the time:
     get:
-        set result to @intrinsic("call", "glfw3", "glfwGetTime")
+        return @intrinsic("call", "glfw3", "glfwGetTime")
 
 # ============================================================
 # Natural Language Wrappers - OpenGL Rendering
@@ -279,59 +279,93 @@ effect draw line from x1 y1 to x2 y2:
 
 expression key k is pressed in window w:
     get:
-        set result to @intrinsic("call", "glfw3", "glfwGetKey", w, k)
+        return @intrinsic("call", "glfw3", "glfwGetKey", w, k)
 
 expression mouse button b is pressed in window w:
     get:
-        set result to @intrinsic("call", "glfw3", "glfwGetMouseButton", w, b)
+        return @intrinsic("call", "glfw3", "glfwGetMouseButton", w, b)
 
 # Key constants (common keys)
 expression KEY_ESCAPE:
     get:
-        set result to 256
+        return 256
 
 expression KEY_SPACE:
     get:
-        set result to 32
+        return 32
 
 expression KEY_ENTER:
     get:
-        set result to 257
+        return 257
 
 expression KEY_UP:
     get:
-        set result to 265
+        return 265
 
 expression KEY_DOWN:
     get:
-        set result to 264
+        return 264
 
 expression KEY_LEFT:
     get:
-        set result to 263
+        return 263
 
 expression KEY_RIGHT:
     get:
-        set result to 262
+        return 262
 
 # Mouse button constants
 expression MOUSE_LEFT:
     get:
-        set result to 0
+        return 0
 
 expression MOUSE_RIGHT:
     get:
-        set result to 1
+        return 1
 
 expression MOUSE_MIDDLE:
     get:
-        set result to 2
+        return 2
 
 # GLFW key state constants
 expression GLFW_PRESS:
     get:
-        set result to 1
+        return 1
 
 expression GLFW_RELEASE:
     get:
-        set result to 0
+        return 0
+
+# ============================================================
+# Mouse Cursor Position
+# ============================================================
+# Note: glfwGetCursorPos requires output parameters (double pointers)
+# which the current FFI system doesn't support. These patterns
+# provide a workaround using global state updated via callbacks.
+#
+# REQUIRES: FFI enhancement for output parameters OR callback system
+#
+# For now, we store mouse position in global variables that would
+# be updated by a cursor position callback.
+
+# Global mouse position variables (set by callback)
+set _mouse_x to 0
+set _mouse_y to 0
+
+# Get the current mouse X position
+expression mouse x position:
+    get:
+        return _mouse_x
+
+# Get the current mouse Y position
+expression mouse y position:
+    get:
+        return _mouse_y
+
+# Alternative: Direct GLFW call if FFI supports output parameters
+# This would require @intrinsic("call_with_outputs", ...)
+# expression mouse x in window w:
+#     return @intrinsic("call_out", "glfw3", "glfwGetCursorPos", w, 0)
+#
+# expression mouse y in window w:
+#     return @intrinsic("call_out", "glfw3", "glfwGetCursorPos", w, 1)

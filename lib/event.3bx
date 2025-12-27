@@ -43,7 +43,7 @@ effect cancel the event:
 
 expression event is cancelled:
     get:
-        @intrinsic("is_event_cancelled")
+        return @intrinsic("is_event_cancelled")
 
 # One-time handlers
 effect once eventName: handlerBody:
@@ -62,15 +62,15 @@ effect remove all handlers for eventName:
 # Accessing event data in handlers
 expression the event:
     get:
-        @intrinsic("get_current_event")
+        return @intrinsic("get_current_event")
 
 expression event data:
     get:
-        @intrinsic("get_event_data")
+        return @intrinsic("get_event_data")
 
 expression fieldName of the event:
     get:
-        @intrinsic("get_event_field", fieldName)
+        return @intrinsic("get_event_field", fieldName)
 
 # Common built-in events
 event:

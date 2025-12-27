@@ -11,6 +11,8 @@ namespace tbx {
 
 // Forward declarations
 struct ASTVisitor;
+struct Statement;
+using StmtPtr = std::unique_ptr<Statement>;
 
 // Base AST node
 struct ASTNode {
@@ -45,6 +47,17 @@ struct Identifier : Expression {
     void accept(ASTVisitor& visitor) override;
 };
 
+struct BooleanLiteral : Expression {
+    bool value;
+    void accept(ASTVisitor& visitor) override;
+};
+
+struct UnaryExpr : Expression {
+    TokenType op;
+    ExprPtr operand;
+    void accept(ASTVisitor& visitor) override;
+};
+
 struct BinaryExpr : Expression {
     ExprPtr left;
     TokenType op;
@@ -59,9 +72,22 @@ struct NaturalExpr : Expression {
     void accept(ASTVisitor& visitor) override;
 };
 
+// Lazy expression - wraps an expression for deferred evaluation
+// Syntax: {expression} - captures without evaluating
+struct LazyExpr : Expression {
+    ExprPtr inner;                       // The wrapped expression
+    void accept(ASTVisitor& visitor) override;
+};
+
+// Block expression - captures an indented code block as a value
+// Used for section parameters in patterns like "loop while {condition}:"
+struct BlockExpr : Expression {
+    std::vector<StmtPtr> statements;     // The captured statements
+    void accept(ASTVisitor& visitor) override;
+};
+
 // Statement nodes
 struct Statement : ASTNode {};
-using StmtPtr = std::unique_ptr<Statement>;
 
 struct ExpressionStmt : Statement {
     ExprPtr expression;
@@ -105,11 +131,19 @@ struct IntrinsicCall : Expression {
     void accept(ASTVisitor& visitor) override;
 };
 
+// Parameter type for pattern elements
+enum class PatternParamType {
+    Normal,      // Regular eager parameter
+    Lazy,        // Lazy parameter {param} - deferred evaluation
+    Section      // Section parameter - captures indented block
+};
+
 // A single element in a pattern syntax (either literal word or parameter)
 struct PatternElement {
     bool is_param;           // true if parameter, false if literal word
     bool is_optional;        // true if element is optional (e.g., [the], [a])
     std::string value;       // Word text or parameter name
+    PatternParamType param_type = PatternParamType::Normal;  // Parameter type
 };
 
 // Pattern definition
@@ -161,8 +195,12 @@ struct ASTVisitor {
     virtual void visit(FloatLiteral& node) = 0;
     virtual void visit(StringLiteral& node) = 0;
     virtual void visit(Identifier& node) = 0;
+    virtual void visit(BooleanLiteral& node) = 0;
+    virtual void visit(UnaryExpr& node) = 0;
     virtual void visit(BinaryExpr& node) = 0;
     virtual void visit(NaturalExpr& node) = 0;
+    virtual void visit(LazyExpr& node) = 0;
+    virtual void visit(BlockExpr& node) = 0;
     virtual void visit(ExpressionStmt& node) = 0;
     virtual void visit(SetStatement& node) = 0;
     virtual void visit(IfStatement& node) = 0;

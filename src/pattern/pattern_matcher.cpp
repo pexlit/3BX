@@ -114,19 +114,51 @@ std::optional<MatchResult> PatternMatcher::tryMatch(
                 currentPos++;
             }
         } else {
-            // Parameter - capture expression
+            // Parameter - capture expression based on parameter type
             std::vector<PatternElement> remaining(
                 pattern->elements.begin() + elementIndex + 1,
                 pattern->elements.end()
             );
 
-            auto paramResult = matchParam(elem, tokens, currentPos, remaining);
-            if (!paramResult) {
-                return std::nullopt;
+            if (elem.param_type == PatternParamType::Section) {
+                // Section parameters capture an indented block
+                // This is handled at the statement matching level, not here
+                // Create a placeholder BlockExpr that will be filled in later
+                auto blockExpr = std::make_unique<BlockExpr>();
+                blockExpr->location = (currentPos < tokens.size()) ? tokens[currentPos].location : SourceLocation{};
+                bindings[elem.value] = std::move(blockExpr);
+                // Section parameters don't consume tokens here - block is captured separately
             }
+            else if (elem.param_type == PatternParamType::Lazy) {
+                // Lazy parameter - wrap in LazyExpr if not already
+                auto paramResult = matchParam(elem, tokens, currentPos, remaining);
+                if (!paramResult) {
+                    return std::nullopt;
+                }
 
-            bindings[elem.value] = std::move(paramResult->first);
-            currentPos = paramResult->second;
+                // Check if the captured expression is already a LazyExpr
+                LazyExpr* existing = dynamic_cast<LazyExpr*>(paramResult->first.get());
+                if (existing) {
+                    bindings[elem.value] = std::move(paramResult->first);
+                } else {
+                    // Wrap in LazyExpr
+                    auto lazy = std::make_unique<LazyExpr>();
+                    lazy->location = paramResult->first->location;
+                    lazy->inner = std::move(paramResult->first);
+                    bindings[elem.value] = std::move(lazy);
+                }
+                currentPos = paramResult->second;
+            }
+            else {
+                // Normal eager parameter
+                auto paramResult = matchParam(elem, tokens, currentPos, remaining);
+                if (!paramResult) {
+                    return std::nullopt;
+                }
+
+                bindings[elem.value] = std::move(paramResult->first);
+                currentPos = paramResult->second;
+            }
         }
     }
 

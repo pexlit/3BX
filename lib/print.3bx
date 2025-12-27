@@ -5,10 +5,9 @@ effect print value:
     when triggered:
         @intrinsic("print", value)
 
-# Print with message
-effect print msg to the console:
+effect print value to the console:
     when triggered:
-        @intrinsic("print", msg)
+        @intrinsic("print", value)
 
 # Print with label
 effect print label value:
