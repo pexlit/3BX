@@ -1,0 +1,23 @@
+expression number section[s|] up:
+	get:
+		return @intrinsic("section", number)
+
+#the section in which 'the current section' is referenced, so the calling section of this expression section (1 up)
+expression [the current|this|] section:
+	get:
+		return 1 section up
+
+#the section that called the section in which this pattern is referenced, so the calling section of the calling section (2 up)
+expression:
+	patterns:
+		[the|] [calling|outer|parent] section
+	get:
+		return 2 sections up
+
+#execute a section
+effect execute section:
+	when triggered:
+		@intrinsic("execute", section)
+
+
+effect break loop:

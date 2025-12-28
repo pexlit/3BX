@@ -1,17 +1,7 @@
 #include "pattern/pattern_registry.hpp"
 #include <algorithm>
-#include <set>
 
 namespace tbx {
-
-// Reserved words that are literals in pattern syntax
-static const std::set<std::string> reservedWords = {
-    "set", "to", "if", "then", "else", "while", "loop", "function", "return",
-    "is", "the", "a", "an", "and", "or", "not", "pattern", "syntax", "when",
-    "parsed", "triggered", "priority", "import", "use", "from", "class",
-    "members", "created", "each", "member", "of", "new", "with", "by",
-    "multiply", "add", "subtract", "divide", "print"
-};
 
 PatternRegistry::PatternRegistry() {
     // Initialize with an empty scope
@@ -35,10 +25,44 @@ void PatternRegistry::registerPattern(std::unique_ptr<Pattern> pattern) {
 }
 
 void PatternRegistry::registerFromDef(PatternDef* def) {
+    // Store raw definition for semantic variable deduction
+    raw_definitions_.push_back(def);
+
+    // If the syntax is already fully parsed (e.g., from parsePatternSyntaxUntilColon),
+    // register the pattern immediately so it's available for later statements in the same file
+    if (!def->syntax.empty()) {
+        bool hasParams = false;
+        for (const auto& elem : def->syntax) {
+            if (elem.is_param) {
+                hasParams = true;
+                break;
+            }
+        }
+        // If we have params already identified, the syntax is fully parsed
+        if (hasParams) {
+            updateResolvedPattern(def);
+        }
+    }
+}
+
+void PatternRegistry::updateResolvedPattern(PatternDef* def) {
     auto pattern = std::make_unique<Pattern>();
     pattern->id = "pattern_" + std::to_string(patterns_.size());
     pattern->elements = def->syntax;
     pattern->definition = def;
+    
+    // Register semantic priority info
+    if (!def->group.empty()) {
+        precedence_.assignPatternToGroup(PrecedenceRegistry::canonicalize(def->syntax), def->group);
+    }
+    for (const auto& rule : def->priority_rules) {
+        precedence_.addPatternRelation(
+            PrecedenceRegistry::canonicalize(def->syntax), 
+            rule.first, 
+            rule.second
+        );
+    }
+    
     registerPattern(std::move(pattern));
 }
 
@@ -123,7 +147,10 @@ ClassDef* PatternRegistry::getClass(const std::string& name) {
 }
 
 bool PatternRegistry::isReservedWord(const std::string& word) {
-    return reservedWords.count(word) > 0;
+    // No reserved words - all words are treated the same
+    // Pattern matching determines if a word is literal or parameter
+    (void)word;
+    return false;
 }
 
 } // namespace tbx

@@ -39,7 +39,7 @@ pattern:
 
 ## Patterns with Parameters
 
-The real power comes when you add **parameters** - values that the user fills in. Any word in your syntax that isn't a "reserved word" becomes a parameter:
+The real power comes when you add **parameters** - values that the user fills in. Any word in your syntax becomes a parameter when you use it:
 
 ```
 pattern:

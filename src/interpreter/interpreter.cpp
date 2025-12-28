@@ -287,9 +287,6 @@ void Interpreter::visit(UnaryExpr& node) {
     Value operand = evaluateExpression(*node.operand);
 
     switch (node.op) {
-        case TokenType::NOT:
-            currentValue_ = Value(!operand.isTruthy());
-            break;
         case TokenType::MINUS:
             if (operand.isInt()) {
                 currentValue_ = Value(-operand.asInt());
@@ -367,14 +364,6 @@ void Interpreter::visit(BinaryExpr& node) {
 
         case TokenType::GREATER_EQUAL:
             currentValue_ = Value(left.asNumber() >= right.asNumber());
-            break;
-
-        case TokenType::AND:
-            currentValue_ = Value(left.isTruthy() && right.isTruthy());
-            break;
-
-        case TokenType::OR:
-            currentValue_ = Value(left.isTruthy() || right.isTruthy());
             break;
 
         default:

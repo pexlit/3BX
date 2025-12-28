@@ -146,11 +146,23 @@ struct PatternElement {
     PatternParamType param_type = PatternParamType::Normal;  // Parameter type
 };
 
+// Priority relation type
+enum class Relation {
+    Before,    // This pattern binds tighter than target
+    After      // This pattern binds looser than target
+};
+
 // Pattern definition
 struct PatternDef : Statement {
-    std::vector<PatternElement> syntax;  // The pattern syntax template
-    std::vector<StmtPtr> when_parsed;    // Compile-time expansion (optional)
-    std::vector<StmtPtr> when_triggered; // Runtime behavior
+    std::vector<PatternElement> syntax;       // The pattern syntax template
+    std::vector<std::string> raw_syntax;      // Raw syntax strings (for deduction before parsing)
+    std::string group;                        // Precedence group (optional)
+    
+    // Relative priority rules
+    std::vector<std::pair<Relation, std::string>> priority_rules;
+
+    std::vector<StmtPtr> when_parsed;         // Compile-time expansion (optional)
+    std::vector<StmtPtr> when_triggered;      // Runtime behavior
     void accept(ASTVisitor& visitor) override;
 };
 

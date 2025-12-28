@@ -6,58 +6,28 @@ expression a new className:
     get:
         return @intrinsic("create_instance", className)
 
-expression create a className:
-    get:
-        return @intrinsic("create_instance", className)
-
 # Accessing members
-expression memberName of object:
+expression [the] memberName of object:
     get:
         return @intrinsic("get_member", object, memberName)
+	set to value:
+		@intrinsic("set_member", object, memberName, value)
 
-expression the memberName of object:
-    get:
-        return @intrinsic("get_member", object, memberName)
-
-# Setting members
-effect set memberName of object to value:
-    when triggered:
-        @intrinsic("set_member", object, memberName, value)
-
-# Calling methods
-effect methodName object:
-    when triggered:
-        @intrinsic("call_method", object, methodName)
-
-effect methodName object with arg:
-    when triggered:
-        @intrinsic("call_method_with_arg", object, methodName, arg)
-
-# Expression for operating on all members of a class
-expression each member:
+# represents a list of members. will return a list of references to members
+expression:
+	patterns:
+		each member
+		all members
     used inside:
         class
-    when set to val:
+    set to val:
         @intrinsic("set_each_member", val)
-    when added to val:
+    add val:
+		loop 
         @intrinsic("add_each_member", val)
-    when subtracted from val:
+    substract val:
         @intrinsic("sub_each_member", val)
-    when multiplied by val:
+    multiplied by val:
         @intrinsic("mul_each_member", val)
-    when divided by val:
-        @intrinsic("div_each_member", val)
-
-expression all members:
-    used inside:
-        class
-    when set to val:
-        @intrinsic("set_each_member", val)
-    when added to val:
-        @intrinsic("add_each_member", val)
-    when subtracted from val:
-        @intrinsic("sub_each_member", val)
-    when multiplied by val:
-        @intrinsic("mul_each_member", val)
-    when divided by val:
+    divide by val:
         @intrinsic("div_each_member", val)

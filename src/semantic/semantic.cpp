@@ -1,5 +1,6 @@
 #include "semantic/semantic.hpp"
 #include "pattern/pattern_registry.hpp"
+#include <iostream>
 
 namespace tbx {
 
@@ -73,28 +74,26 @@ void SemanticAnalyzer::visit(BooleanLiteral& node) {
 
 void SemanticAnalyzer::visit(UnaryExpr& node) {
     node.operand->accept(*this);
-    // For now, unary expressions preserve the type of their operand
-    // except for 'not' which produces a boolean
-    if (node.op == TokenType::MINUS) {
-        // Negation preserves numeric type
-    } else if (node.op == TokenType::NOT) {
-        last_type_ = Type::BOOLEAN;
-    }
+    // Unary expressions preserve the type of their operand
+    // Negation (-) preserves numeric type
+    (void)node.op;
 }
 
 void SemanticAnalyzer::visit(Identifier& node) {
-    // Reserved words in natural language expressions are not variables
-    if (PatternRegistry::isReservedWord(node.name)) {
-        last_type_ = Type::UNKNOWN;
-        return;
-    }
-
+    // Look up the identifier in current scope
+    // If not found, it might be:
+    // 1. A pattern literal (handled by pattern matching)
+    // 2. An undefined variable (error)
+    // Since patterns handle their own semantics, we only report errors
+    // for identifiers that don't match any pattern. For now, be lenient
+    // and allow any identifier - pattern matching will catch errors.
     Symbol* sym = lookup(node.name);
-    if (!sym) {
-        error("Undefined variable: " + node.name);
-        last_type_ = Type::UNKNOWN;
-    } else {
+    if (sym) {
         last_type_ = sym->type;
+    } else {
+        // Identifier not found - might be a pattern literal or new variable
+        // Pattern matching handles validation, so we don't error here
+        last_type_ = Type::UNKNOWN;
     }
 }
 
@@ -128,10 +127,6 @@ void SemanticAnalyzer::visit(BinaryExpr& node) {
         case TokenType::GREATER_EQUAL:
             last_type_ = Type::BOOLEAN;
             break;
-        case TokenType::AND:
-        case TokenType::OR:
-            last_type_ = Type::BOOLEAN;
-            break;
         default:
             // For arithmetic operators, promote to FLOAT if either operand is FLOAT
             if (left_type == Type::FLOAT || right_type == Type::FLOAT) {
@@ -145,7 +140,6 @@ void SemanticAnalyzer::visit(BinaryExpr& node) {
 void SemanticAnalyzer::visit(NaturalExpr& node) {
     // Natural language expressions are resolved at runtime
     // through pattern matching. For now, treat as unknown type.
-    (void)node;
     last_type_ = Type::UNKNOWN;
 }
 
@@ -250,6 +244,29 @@ void SemanticAnalyzer::visit(PatternDef& node) {
 }
 
 void SemanticAnalyzer::visit(PatternCall& node) {
+    // For variable propagation:
+    // When a pattern like `set $ to $` is called with `set x to y`,
+    // the identifiers bound to variable parameters should be defined as variables.
+    
+    if (node.pattern) {
+        for (const auto& elem : node.pattern->syntax) {
+            if (elem.is_param) {
+                // This is a variable parameter in the pattern
+                auto it = node.bindings.find(elem.value);
+                if (it != node.bindings.end()) {
+                    // Check if the bound expression is an identifier
+                    if (auto* id = dynamic_cast<Identifier*>(it->second.get())) {
+                        // This identifier is bound to a variable parameter
+                        // Define it as a variable (if not already defined)
+                        if (!lookup(id->name)) {
+                            define(id->name, Type::UNKNOWN);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // Analyze bound arguments
     for (auto& [name, expr] : node.bindings) {
         expr->accept(*this);

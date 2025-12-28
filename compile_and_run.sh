@@ -5,6 +5,8 @@
 
 set -e
 
+TIMEOUT=20
+
 if [ -z "$1" ]; then
     echo "Usage: $0 <file.3bx>"
     exit 1
@@ -24,10 +26,10 @@ if [ ! -f "$SOURCE_FILE" ]; then
     exit 1
 fi
 
-# Compile to LLVM IR
+# Compile to LLVM IR (with timeout)
 echo "Compiling: $SOURCE_FILE"
-"$BUILD_DIR/3bx" --emit-ir "$SOURCE_FILE" > "$IR_FILE"
+timeout $TIMEOUT "$BUILD_DIR/3bx" --emit-ir "$SOURCE_FILE" > "$IR_FILE"
 
-# Run the IR using lli (LLVM interpreter)
+# Run the IR using lli (LLVM interpreter) (with timeout)
 echo "Running..."
-lli "$IR_FILE"
+timeout $TIMEOUT lli "$IR_FILE"

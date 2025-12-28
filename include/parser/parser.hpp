@@ -6,7 +6,6 @@
 #include "pattern/pattern_matcher.hpp"
 #include <memory>
 #include <vector>
-#include <set>
 
 namespace tbx {
 
@@ -20,6 +19,9 @@ public:
     // Get the pattern registry (patterns defined in parsed code)
     PatternRegistry& getRegistry() { return registry_; }
 
+    // Parse expression with minimum precedence (Pratt Parsing)
+    ExprPtr expression(int minPrecedence = 0);
+    
     // Set shared registry for multi-file parsing
     void setSharedRegistry(PatternRegistry* registry);
 
@@ -40,8 +42,12 @@ private:
 
     void advance();
     bool check(TokenType type);
+    bool checkWord(const std::string& word);
     bool match(TokenType type);
+    bool matchWord(const std::string& word);
     Token consume(TokenType type, const std::string& message);
+    Token consumeWord(const std::string& word, const std::string& message);
+    bool isOperator(TokenType type);
 
     // Check if at specific token type
     bool checkAt(size_t pos, TokenType type);
@@ -54,15 +60,12 @@ private:
 
     // Grammar rules
     StmtPtr statement();
-    StmtPtr setStatement();
-    StmtPtr ifStatement();
-    StmtPtr whileStatement();
-    StmtPtr functionDeclaration();
     StmtPtr patternDefinition();
     StmtPtr classDefinition();
     StmtPtr expressionDefinition();
     StmtPtr effectDefinition();
     StmtPtr sectionDefinition();
+    StmtPtr conditionDefinition();
     StmtPtr importStatement();
     StmtPtr importFunctionDeclaration();
     StmtPtr useStatement();
@@ -70,10 +73,8 @@ private:
     // Try to match a statement against registered patterns
     StmtPtr matchPatternStatement();
 
-    // Parse pattern syntax line (e.g., "set var to val")
+    // Parse pattern syntax line
     std::vector<PatternElement> parsePatternSyntax();
-
-    // Parse pattern syntax until colon (for inline definitions)
     std::vector<PatternElement> parsePatternSyntaxUntilColon();
 
     // Parse a comma-separated list of identifiers
@@ -81,20 +82,9 @@ private:
 
     // Parse indented block
     std::vector<StmtPtr> parseBlock();
-
-    // Parse block with explicit indent level
     std::vector<StmtPtr> parseBlockWithIndent(int baseIndent);
 
-    ExprPtr expression();
-    ExprPtr logicalOr();
-    ExprPtr logicalAnd();
-    ExprPtr logicalNot();
-    ExprPtr equality();
-    ExprPtr comparison();
-    ExprPtr term();
-    ExprPtr factor();
-    ExprPtr unary();
-    ExprPtr primary();
+    // Expression helpers
     ExprPtr intrinsicCall();
     ExprPtr lazyExpression();
 };

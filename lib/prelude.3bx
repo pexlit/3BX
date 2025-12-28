@@ -1,6 +1,13 @@
 # 3BX Standard Prelude
 # Core language patterns defined in 3BX itself
 
+# === Return ===
+# Defined first so it can be used in other patterns
+
+effect return val:
+    when triggered:
+        @intrinsic("return", val)
+
 # === Variables ===
 
 effect set var to val:
@@ -10,6 +17,10 @@ effect set var to val:
 # === Output ===
 
 effect write msg to the console:
+    when triggered:
+        @intrinsic("print", msg)
+
+effect print msg:
     when triggered:
         @intrinsic("print", msg)
 
@@ -24,54 +35,75 @@ expression left - right:
         return @intrinsic("sub", left, right)
 
 expression left * right:
+    priority: before left + right
     get:
         return @intrinsic("mul", left, right)
 
 expression left / right:
+    priority: before left + right
     get:
         return @intrinsic("div", left, right)
 
 # === Comparison ===
+# These operate AFTER addition (lower priority)
 
-expression:
-    patterns:
-        val1 is equal to val2
-        val1 = val2
+expression val1 is equal to val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_eq", val1, val2)
 
-expression:
-    patterns:
-        val1 is less than val2
-        val1 < val2
+expression val1 = val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_eq", val1, val2)
+
+expression val1 is less than val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_lt", val1, val2)
 
-expression:
-    patterns:
-        val1 is greater than val2
-        val1 > val2
+expression val1 < val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_lt", val1, val2)
+
+expression val1 is greater than val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_gt", val1, val2)
 
-expression:
-    patterns:
-        val1 is less than or equal to val2
-        val1 <= val2
+expression val1 > val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_gt", val1, val2)
+
+expression val1 is less than or equal to val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_lte", val1, val2)
 
-expression:
-    patterns:
-        val1 is greater than or equal to val2
-        val1 >= val2
+expression val1 <= val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_lte", val1, val2)
+
+expression val1 is greater than or equal to val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_gte", val1, val2)
 
-expression:
-    patterns:
-        val1 is not equal to val2
-        val1 != val2
+expression val1 >= val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_gte", val1, val2)
+
+expression val1 is not equal to val2:
+    priority: after val1 + val2
+    get:
+        return @intrinsic("cmp_neq", val1, val2)
+
+expression val1 != val2:
+    priority: after val1 + val2
     get:
         return @intrinsic("cmp_neq", val1, val2)
 
@@ -85,8 +117,3 @@ condition if cond then:
     when triggered:
         @intrinsic("branch", cond)
 
-# === Return ===
-
-effect return val:
-    when triggered:
-        @intrinsic("return", val)

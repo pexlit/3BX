@@ -5,6 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Enable debug symbols
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+
 # Find LLVM
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
@@ -44,6 +48,8 @@ set(PATTERN_SOURCES
     src/pattern/pattern_registry.cpp
     src/pattern/pattern_matcher.cpp
     src/pattern/patternTree.cpp
+    src/pattern/precedence.cpp
+    src/pattern/pattern_resolution.cpp
 )
 
 set(LSP_SOURCES

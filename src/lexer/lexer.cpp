@@ -1,58 +1,7 @@
 #include "lexer/lexer.hpp"
 #include <cctype>
-#include <unordered_map>
 
 namespace tbx {
-
-static const std::unordered_map<std::string, TokenType> keywords = {
-    {"if", TokenType::IF},
-    {"then", TokenType::THEN},
-    {"else", TokenType::ELSE},
-    {"loop", TokenType::LOOP},
-    {"while", TokenType::WHILE},
-    {"function", TokenType::FUNCTION},
-    {"return", TokenType::RETURN},
-    {"set", TokenType::SET},
-    {"to", TokenType::TO},
-    {"is", TokenType::IS},
-    // Boolean literals and logical operators
-    {"true", TokenType::TRUE},
-    {"false", TokenType::FALSE},
-    {"and", TokenType::AND},
-    {"or", TokenType::OR},
-    {"not", TokenType::NOT},
-    // Pattern system keywords
-    {"pattern", TokenType::PATTERN},
-    {"syntax", TokenType::SYNTAX},
-    {"when", TokenType::WHEN},
-    {"parsed", TokenType::PARSED},
-    {"triggered", TokenType::TRIGGERED},
-    {"priority", TokenType::PRIORITY},
-    {"import", TokenType::IMPORT},
-    {"use", TokenType::USE},
-    {"from", TokenType::FROM},
-    {"the", TokenType::THE},
-    // Class system keywords
-    {"class", TokenType::CLASS},
-    {"expression", TokenType::EXPRESSION},
-    {"members", TokenType::MEMBERS},
-    {"created", TokenType::CREATED},
-    {"new", TokenType::NEW},
-    {"of", TokenType::OF},
-    {"a", TokenType::A},
-    {"an", TokenType::AN},
-    {"with", TokenType::WITH},
-    {"by", TokenType::BY},
-    {"each", TokenType::EACH},
-    {"member", TokenType::MEMBER},
-    {"print", TokenType::PRINT},
-    {"effect", TokenType::EFFECT},
-    {"get", TokenType::GET},
-    {"patterns", TokenType::PATTERNS},
-    {"result", TokenType::RESULT},
-    {"multiply", TokenType::MULTIPLY},
-    {"section", TokenType::SECTION},
-};
 
 Lexer::Lexer(const std::string& source, const std::string& filename)
     : source_(source), filename_(filename) {}
@@ -89,14 +38,14 @@ Token Lexer::nextToken() {
         return scanString();
     }
 
-    // Identifiers and keywords
+    // Identifiers (all words are identifiers - no keyword distinction)
     if (std::isalpha(c) || c == '_') {
         pos_--;
         column_--;
         return scanIdentifier();
     }
 
-    // Single character tokens
+    // Single and multi-character tokens
     switch (c) {
         case '+': return makeToken(TokenType::PLUS, "+");
         case '-': return makeToken(TokenType::MINUS, "-");
@@ -134,7 +83,8 @@ Token Lexer::nextToken() {
                 advance();
                 return makeToken(TokenType::EQUALS, "==");
             }
-            return makeToken(TokenType::ERROR, "=");
+            // Single '=' is valid for pattern matching (e.g., "a = b")
+            return makeToken(TokenType::EQUALS, "=");
         case '!':
             if (current() == '=') {
                 advance();
@@ -147,32 +97,32 @@ Token Lexer::nextToken() {
 }
 
 Token Lexer::peek() {
-    size_t saved_pos = pos_;
-    size_t saved_line = line_;
-    size_t saved_column = column_;
+    size_t savedPos = pos_;
+    size_t savedLine = line_;
+    size_t savedColumn = column_;
 
     Token token = nextToken();
 
-    pos_ = saved_pos;
-    line_ = saved_line;
-    column_ = saved_column;
+    pos_ = savedPos;
+    line_ = savedLine;
+    column_ = savedColumn;
 
     return token;
 }
 
 Token Lexer::peekAhead(size_t n) {
-    size_t saved_pos = pos_;
-    size_t saved_line = line_;
-    size_t saved_column = column_;
+    size_t savedPos = pos_;
+    size_t savedLine = line_;
+    size_t savedColumn = column_;
 
     Token token;
     for (size_t i = 0; i <= n; i++) {
         token = nextToken();
     }
 
-    pos_ = saved_pos;
-    line_ = saved_line;
-    column_ = saved_column;
+    pos_ = savedPos;
+    line_ = savedLine;
+    column_ = savedColumn;
 
     return token;
 }
@@ -250,22 +200,22 @@ Token Lexer::scanString() {
 
 Token Lexer::scanNumber() {
     std::string num;
-    bool is_float = false;
+    bool isFloat = false;
 
     while (!atEnd() && std::isdigit(current())) {
         num += advance();
     }
 
     if (current() == '.' && pos_ + 1 < source_.size() && std::isdigit(source_[pos_ + 1])) {
-        is_float = true;
+        isFloat = true;
         num += advance(); // .
         while (!atEnd() && std::isdigit(current())) {
             num += advance();
         }
     }
 
-    Token token = makeToken(is_float ? TokenType::FLOAT : TokenType::INTEGER, num);
-    if (is_float) {
+    Token token = makeToken(isFloat ? TokenType::FLOAT : TokenType::INTEGER, num);
+    if (isFloat) {
         token.value = std::stod(num);
     } else {
         token.value = std::stoll(num);
@@ -279,12 +229,8 @@ Token Lexer::scanIdentifier() {
         id += advance();
     }
 
-    // Check for keywords
-    auto it = keywords.find(id);
-    if (it != keywords.end()) {
-        return makeToken(it->second, id);
-    }
-
+    // All words are identifiers - no keyword distinction
+    // Pattern matching determines if a word is a literal or parameter
     return makeToken(TokenType::IDENTIFIER, id);
 }
 

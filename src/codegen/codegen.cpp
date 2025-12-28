@@ -92,168 +92,23 @@ void CodeGenerator::visit(BooleanLiteral& node) {
 }
 
 void CodeGenerator::visit(UnaryExpr& node) {
-    node.operand->accept(*this);
-    llvm::Value* operand = current_value_;
+    // UnaryExpr should not be created by the parser anymore.
+    // All operators should be matched as patterns and create PatternCall nodes.
+    // This is kept as a fallback but should not be reached in normal operation.
 
-    if (!operand) {
-        current_value_ = nullptr;
-        return;
-    }
-
-    switch (node.op) {
-        case TokenType::NOT: {
-            // Convert to boolean if needed
-            if (!operand->getType()->isIntegerTy(1)) {
-                if (operand->getType()->isIntegerTy()) {
-                    operand = builder_->CreateICmpNE(
-                        operand,
-                        llvm::ConstantInt::get(operand->getType(), 0),
-                        "tobool"
-                    );
-                } else if (operand->getType()->isFloatingPointTy()) {
-                    operand = builder_->CreateFCmpONE(
-                        operand,
-                        llvm::ConstantFP::get(operand->getType(), 0.0),
-                        "tobool"
-                    );
-                }
-            }
-            current_value_ = builder_->CreateNot(operand, "nottmp");
-            break;
-        }
-        case TokenType::MINUS: {
-            if (operand->getType()->isFloatingPointTy()) {
-                current_value_ = builder_->CreateFNeg(operand, "negtmp");
-            } else {
-                current_value_ = builder_->CreateNeg(operand, "negtmp");
-            }
-            break;
-        }
-        default:
-            current_value_ = nullptr;
-    }
+    // For backwards compatibility during transition, generate a placeholder
+    current_value_ = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0);
 }
 
 void CodeGenerator::visit(BinaryExpr& node) {
-    node.left->accept(*this);
-    llvm::Value* left = current_value_;
+    // BinaryExpr should not be created by the parser anymore.
+    // All operators should be matched as patterns and create PatternCall nodes.
+    // This is kept as a fallback but should not be reached in normal operation.
+    // If we get here, it means the parser created a BinaryExpr directly,
+    // which violates the LANGUAGE.md design principle.
 
-    node.right->accept(*this);
-    llvm::Value* right = current_value_;
-
-    if (!left || !right) {
-        current_value_ = nullptr;
-        return;
-    }
-
-    // Check if either operand is a float
-    bool left_is_float = left->getType()->isFloatingPointTy();
-    bool right_is_float = right->getType()->isFloatingPointTy();
-    bool use_float = left_is_float || right_is_float;
-
-    // Convert to float if needed for mixed operations
-    if (use_float) {
-        llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
-        if (!left_is_float) {
-            left = builder_->CreateSIToFP(left, double_type, "conv");
-        }
-        if (!right_is_float) {
-            right = builder_->CreateSIToFP(right, double_type, "conv");
-        }
-    }
-
-    switch (node.op) {
-        case TokenType::PLUS:
-            current_value_ = use_float
-                ? builder_->CreateFAdd(left, right, "addtmp")
-                : builder_->CreateAdd(left, right, "addtmp");
-            break;
-        case TokenType::MINUS:
-            current_value_ = use_float
-                ? builder_->CreateFSub(left, right, "subtmp")
-                : builder_->CreateSub(left, right, "subtmp");
-            break;
-        case TokenType::STAR:
-            current_value_ = use_float
-                ? builder_->CreateFMul(left, right, "multmp")
-                : builder_->CreateMul(left, right, "multmp");
-            break;
-        case TokenType::SLASH:
-            current_value_ = use_float
-                ? builder_->CreateFDiv(left, right, "divtmp")
-                : builder_->CreateSDiv(left, right, "divtmp");
-            break;
-        case TokenType::LESS:
-            current_value_ = use_float
-                ? builder_->CreateFCmpOLT(left, right, "cmptmp")
-                : builder_->CreateICmpSLT(left, right, "cmptmp");
-            break;
-        case TokenType::GREATER:
-            current_value_ = use_float
-                ? builder_->CreateFCmpOGT(left, right, "cmptmp")
-                : builder_->CreateICmpSGT(left, right, "cmptmp");
-            break;
-        case TokenType::EQUALS:
-            current_value_ = use_float
-                ? builder_->CreateFCmpOEQ(left, right, "eqtmp")
-                : builder_->CreateICmpEQ(left, right, "eqtmp");
-            break;
-        case TokenType::NOT_EQUALS:
-            current_value_ = use_float
-                ? builder_->CreateFCmpONE(left, right, "netmp")
-                : builder_->CreateICmpNE(left, right, "netmp");
-            break;
-        case TokenType::LESS_EQUAL:
-            current_value_ = use_float
-                ? builder_->CreateFCmpOLE(left, right, "cmptmp")
-                : builder_->CreateICmpSLE(left, right, "cmptmp");
-            break;
-        case TokenType::GREATER_EQUAL:
-            current_value_ = use_float
-                ? builder_->CreateFCmpOGE(left, right, "cmptmp")
-                : builder_->CreateICmpSGE(left, right, "cmptmp");
-            break;
-        case TokenType::AND: {
-            // Convert operands to boolean if needed
-            if (!left->getType()->isIntegerTy(1)) {
-                if (left->getType()->isIntegerTy()) {
-                    left = builder_->CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0), "tobool");
-                } else if (left->getType()->isFloatingPointTy()) {
-                    left = builder_->CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0), "tobool");
-                }
-            }
-            if (!right->getType()->isIntegerTy(1)) {
-                if (right->getType()->isIntegerTy()) {
-                    right = builder_->CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "tobool");
-                } else if (right->getType()->isFloatingPointTy()) {
-                    right = builder_->CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0), "tobool");
-                }
-            }
-            current_value_ = builder_->CreateAnd(left, right, "andtmp");
-            break;
-        }
-        case TokenType::OR: {
-            // Convert operands to boolean if needed
-            if (!left->getType()->isIntegerTy(1)) {
-                if (left->getType()->isIntegerTy()) {
-                    left = builder_->CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0), "tobool");
-                } else if (left->getType()->isFloatingPointTy()) {
-                    left = builder_->CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0), "tobool");
-                }
-            }
-            if (!right->getType()->isIntegerTy(1)) {
-                if (right->getType()->isIntegerTy()) {
-                    right = builder_->CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "tobool");
-                } else if (right->getType()->isFloatingPointTy()) {
-                    right = builder_->CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0), "tobool");
-                }
-            }
-            current_value_ = builder_->CreateOr(left, right, "ortmp");
-            break;
-        }
-        default:
-            current_value_ = nullptr;
-    }
+    // For backwards compatibility during transition, generate a placeholder
+    current_value_ = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*context_), 0);
 }
 
 void CodeGenerator::visit(NaturalExpr& node) {
@@ -503,7 +358,17 @@ void CodeGenerator::visit(IntrinsicCall& node) {
             node.args[1]->accept(*this);
             llvm::Value* right = current_value_;
             if (left && right) {
-                current_value_ = builder_->CreateAdd(left, right, "addtmp");
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFAdd(left, right, "addtmp");
+                } else {
+                    current_value_ = builder_->CreateAdd(left, right, "addtmp");
+                }
             }
         }
     }
@@ -514,7 +379,17 @@ void CodeGenerator::visit(IntrinsicCall& node) {
             node.args[1]->accept(*this);
             llvm::Value* right = current_value_;
             if (left && right) {
-                current_value_ = builder_->CreateSub(left, right, "subtmp");
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFSub(left, right, "subtmp");
+                } else {
+                    current_value_ = builder_->CreateSub(left, right, "subtmp");
+                }
             }
         }
     }
@@ -525,7 +400,17 @@ void CodeGenerator::visit(IntrinsicCall& node) {
             node.args[1]->accept(*this);
             llvm::Value* right = current_value_;
             if (left && right) {
-                current_value_ = builder_->CreateMul(left, right, "multmp");
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFMul(left, right, "multmp");
+                } else {
+                    current_value_ = builder_->CreateMul(left, right, "multmp");
+                }
             }
         }
     }
@@ -536,7 +421,143 @@ void CodeGenerator::visit(IntrinsicCall& node) {
             node.args[1]->accept(*this);
             llvm::Value* right = current_value_;
             if (left && right) {
-                current_value_ = builder_->CreateSDiv(left, right, "divtmp");
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFDiv(left, right, "divtmp");
+                } else {
+                    current_value_ = builder_->CreateSDiv(left, right, "divtmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_lt") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpOLT(left, right, "cmptmp");
+                } else {
+                    current_value_ = builder_->CreateICmpSLT(left, right, "cmptmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_gt") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpOGT(left, right, "cmptmp");
+                } else {
+                    current_value_ = builder_->CreateICmpSGT(left, right, "cmptmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_eq") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpOEQ(left, right, "eqtmp");
+                } else {
+                    current_value_ = builder_->CreateICmpEQ(left, right, "eqtmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_neq") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpONE(left, right, "netmp");
+                } else {
+                    current_value_ = builder_->CreateICmpNE(left, right, "netmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_lte") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpOLE(left, right, "cmptmp");
+                } else {
+                    current_value_ = builder_->CreateICmpSLE(left, right, "cmptmp");
+                }
+            }
+        }
+    }
+    else if (node.name == "cmp_gte") {
+        if (node.args.size() >= 2) {
+            node.args[0]->accept(*this);
+            llvm::Value* left = current_value_;
+            node.args[1]->accept(*this);
+            llvm::Value* right = current_value_;
+            if (left && right) {
+                bool left_is_float = left->getType()->isFloatingPointTy();
+                bool right_is_float = right->getType()->isFloatingPointTy();
+                bool use_float = left_is_float || right_is_float;
+                if (use_float) {
+                    llvm::Type* double_type = llvm::Type::getDoubleTy(*context_);
+                    if (!left_is_float) left = builder_->CreateSIToFP(left, double_type, "conv");
+                    if (!right_is_float) right = builder_->CreateSIToFP(right, double_type, "conv");
+                    current_value_ = builder_->CreateFCmpOGE(left, right, "cmptmp");
+                } else {
+                    current_value_ = builder_->CreateICmpSGE(left, right, "cmptmp");
+                }
             }
         }
     }

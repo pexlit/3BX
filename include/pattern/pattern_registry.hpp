@@ -2,6 +2,7 @@
 
 #include "pattern/pattern.hpp"
 #include "pattern/patternTree.hpp"
+#include "pattern/precedence.hpp"
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -61,6 +62,15 @@ public:
     bool isVariableDefined(const std::string& name) const;
     const std::unordered_set<std::string>& getVariables() const { return allVariables_; }
 
+    // Get raw patterns (for resolution phase)
+    std::vector<PatternDef*>& getRawDefinitions() { return raw_definitions_; }
+
+    // Update a pattern that was just resolved by the Resolver
+    void updateResolvedPattern(PatternDef* def);
+    
+    // Access precedence registry
+    PrecedenceRegistry& getPrecedenceRegistry() { return precedence_; }
+
     // Class lookup
     ClassDef* getClass(const std::string& name);
     const std::vector<std::unique_ptr<ClassDef>>& allClasses() const { return classes_; }
@@ -72,6 +82,12 @@ private:
     std::vector<std::unique_ptr<Pattern>> patterns_;
     std::vector<Pattern*> sortedPatterns_;  // Sorted by priority
     PatternTree tree_;
+    
+    // Raw definitions for semantic analysis phase
+    std::vector<PatternDef*> raw_definitions_;
+    
+    // Precedence system
+    PrecedenceRegistry precedence_;
 
     // Class definitions
     std::vector<std::unique_ptr<ClassDef>> classes_;

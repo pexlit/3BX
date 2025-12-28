@@ -38,6 +38,15 @@ public:
         int minPrecedence = 0
     );
 
+    // Match the tail of a pattern starting from a specific element index
+    // Used for infix patterns where LHS is already parsed
+    std::optional<MatchResult> matchTail(
+        Pattern* pattern,
+        size_t startIndex,
+        const std::vector<Token>& tokens,
+        size_t pos
+    );
+
     // Match a single pattern against tokens
     std::optional<MatchResult> tryMatch(
         Pattern* pattern,
@@ -49,7 +58,15 @@ public:
     std::optional<std::pair<ExprPtr, size_t>> parseExpression(
         const std::vector<Token>& tokens,
         size_t pos,
-        const std::string& stopWord = ""
+        const std::string& stopWord = "",
+        int minPrecedence = 0
+    );
+
+    // Parse a primary expression (literal, identifier, parenthesized, or intrinsic call)
+    // Made public so parser can use it to parse @intrinsic(...) calls
+    std::optional<std::pair<ExprPtr, size_t>> parsePrimary(
+        const std::vector<Token>& tokens,
+        size_t pos
     );
 
 private:
@@ -63,17 +80,12 @@ private:
         const std::vector<PatternElement>& remainingElements
     );
 
-    // Parse a primary expression (literal, identifier, or parenthesized)
-    std::optional<std::pair<ExprPtr, size_t>> parsePrimary(
-        const std::vector<Token>& tokens,
-        size_t pos
-    );
-
     // Parse a binary expression with operator precedence
     std::optional<std::pair<ExprPtr, size_t>> parseBinaryExpr(
         const std::vector<Token>& tokens,
         size_t pos,
-        int minPrecedence
+        int minPrecedence,
+        const std::string& stopWord = ""
     );
 
     // Get operator precedence (higher = binds tighter)

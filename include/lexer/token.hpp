@@ -12,60 +12,7 @@ enum class TokenType {
     STRING,
     IDENTIFIER,
 
-    // Keywords (Skript-like)
-    IF,
-    THEN,
-    ELSE,
-    LOOP,
-    WHILE,
-    FUNCTION,
-    RETURN,
-    SET,
-    TO,
-    IS,
-
-    // Pattern system keywords
-    PATTERN,
-    SYNTAX,
-    WHEN,
-    PARSED,
-    TRIGGERED,
-    PRIORITY,
-    IMPORT,
-    USE,
-    FROM,
-    THE,        // Common word in natural language patterns
-    CLASS,
-    EXPRESSION,
-    MEMBERS,
-    CREATED,
-    NEW,
-    OF,
-    A,
-    AN,
-    WITH,
-    BY,
-    EACH,
-    MEMBER,
-    PRINT,
-    EFFECT,
-    GET,
-    PATTERNS,
-    RESULT,
-    MULTIPLY,
-    APOSTROPHE,
-    SECTION,    // section pattern type for indented blocks
-
-    // Boolean literals
-    TRUE,
-    FALSE,
-
-    // Logical operators
-    AND,
-    OR,
-    NOT,
-
-    // Operators
+    // Operators (punctuation)
     PLUS,
     MINUS,
     STAR,
@@ -86,27 +33,26 @@ enum class TokenType {
     COMMA,
     LPAREN,
     RPAREN,
-    LBRACKET,   // [ for optional syntax elements
-    RBRACKET,   // ] for optional syntax elements
-    LBRACE,     // { for lazy expressions and section parameters
-    RBRACE,     // } for lazy expressions and section parameters
-
-    // Intrinsic
-    AT,             // @ symbol for @intrinsic
+    LBRACKET,
+    RBRACKET,
+    LBRACE,
+    RBRACE,
+    APOSTROPHE,
 
     // Special
+    AT,
     END_OF_FILE,
     ERROR
 };
 
 struct SourceLocation {
-    size_t line;
-    size_t column;
+    size_t line{};
+    size_t column{};
     std::string filename;
 };
 
 struct Token {
-    TokenType type;
+    TokenType type{};
     std::string lexeme;
     SourceLocation location;
 

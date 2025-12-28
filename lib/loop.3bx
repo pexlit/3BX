@@ -3,6 +3,8 @@
 # All loops use the loop_while intrinsic for efficiency - they compile
 # directly to LLVM loops without recursive pattern calls.
 
+import section.3bx
+
 # =============================================================================
 # While Loop
 # =============================================================================
@@ -16,7 +18,7 @@
 #
 section loop while {condition}:
     when triggered:
-        @intrinsic("loop_while", condition, section)
+        @intrinsic("loop_while", condition, the calling section)
 
 # =============================================================================
 # Repeat N Times
@@ -32,7 +34,7 @@ section loop count times:
     when triggered:
         set loopindex to 0
         loop while {loopindex < count}:
-            @intrinsic("execute", section)
+            execute the calling section
             set loopindex to loopindex + 1
 
 # =============================================================================
@@ -48,8 +50,9 @@ section loop count times:
 #
 section do then loop while {condition}:
     when triggered:
-        @intrinsic("execute", section)
-        @intrinsic("loop_while", condition, section)
+        execute the calling section
+		loop while {condition}:
+			execute the calling section
 
 # =============================================================================
 # Range Loop (Exclusive)

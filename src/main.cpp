@@ -101,10 +101,10 @@ std::vector<std::string> extractImports(const std::string& source, const std::st
         auto token = lexer.nextToken();
         if (token.type == tbx::TokenType::END_OF_FILE) break;
 
-        if (token.type == tbx::TokenType::IMPORT) {
-            // Check if next token is FUNCTION (skip import function declarations)
+        if (token.lexeme == "import") {
+            // Check if next token is 'function' (skip import function declarations)
             auto next = lexer.peek();
-            if (next.type == tbx::TokenType::FUNCTION) {
+            if (next.lexeme == "function") {
                 continue;
             }
 
@@ -122,12 +122,12 @@ std::vector<std::string> extractImports(const std::string& source, const std::st
                 imports.push_back(path);
             }
         }
-        else if (token.type == tbx::TokenType::USE) {
+        else if (token.lexeme == "use") {
             // use <name> from <path>
             // Skip to 'from'
             while (true) {
                 auto t = lexer.nextToken();
-                if (t.type == tbx::TokenType::FROM) {
+                if (t.lexeme == "from") {
                     break;
                 }
                 if (t.type == tbx::TokenType::NEWLINE ||
@@ -183,6 +183,10 @@ void collectFiles(
 
 // Parse a file and collect its imports recursively
 // Uses shared registry to accumulate patterns across files
+#include "pattern/pattern_resolution.hpp"
+
+// ... (keep includes consistent)
+
 void parseWithImports(
     const std::string& filePath,
     std::set<std::string>& parsedFiles,
@@ -190,12 +194,21 @@ void parseWithImports(
     tbx::PatternRegistry& sharedRegistry,
     const std::string& originalSource
 ) {
-    // Phase 1: Collect all files in dependency order (imports first)
+    // ... Phase 1 ...
     std::set<std::string> visitedFiles;
     std::vector<std::string> orderedFiles;
+
+    // Auto-load prelude.3bx
+    std::string preludePath = resolveImport("prelude.3bx", filePath);
+    if (fs::exists(preludePath)) {
+        collectFiles(preludePath, visitedFiles, orderedFiles);
+    } else {
+        std::cerr << "Warning: prelude.3bx not found in library paths.\n";
+    }
+
     collectFiles(filePath, visitedFiles, orderedFiles);
 
-    // Phase 2: Parse files in order (imports first, so patterns are available)
+    // Phase 2: Parse files in order
     for (const auto& file : orderedFiles) {
         if (parsedFiles.count(file)) {
             continue;
@@ -207,18 +220,22 @@ void parseWithImports(
         tbx::Lexer lexer(source, file);
         tbx::Parser parser(lexer);
 
-        // Use shared registry so patterns are accumulated
         parser.setSharedRegistry(&sharedRegistry);
 
         auto program = parser.parse();
 
-        // Add non-import statements to the collection
+        // Add non-import statements
         for (auto& stmt : program->statements) {
             if (!dynamic_cast<tbx::ImportStmt*>(stmt.get()) &&
                 !dynamic_cast<tbx::UseStmt*>(stmt.get())) {
                 allStatements.push_back(std::move(stmt));
             }
         }
+        
+        // Resolve newly added patterns so they are available for subsequent files
+        // This calculates variables, specificity, and priorities
+        tbx::PatternResolver resolver(sharedRegistry);
+        resolver.resolveAll();
     }
 }
 

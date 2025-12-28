@@ -1,0 +1,9 @@
+import print.3bx
+
+expression customadder:
+	get:
+		print "custom adder:"
+		set result to @intrinsic("add", 1, 2)
+		print result
+
+customadder
