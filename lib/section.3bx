@@ -1,23 +1,138 @@
+# 1 section up = the calling section of the calling section.
+# lines with a colon belong to the section below them.
 expression number section[s|] up:
 	get:
 		return @intrinsic("section", number)
 
-#the section in which 'the current section' is referenced, so the calling section of this expression section (1 up)
-expression [the current|this|] section:
+#the section in which 'the current section' is referenced, so the calling section of this expression section (1 up).
+expression [the current|this|] [section|loop|statement]:
 	get:
 		return 1 section up
 
 #the section that called the section in which this pattern is referenced, so the calling section of the calling section (2 up)
 expression:
 	patterns:
-		[the|] [calling|outer|parent] section
+		[the|] [calling|outer|parent] [section|loop|statement]
 	get:
 		return 2 sections up
 
+expression [the|] [following|next] section of testsection:
+	get:
+		return @intrinsic("next_section", testsection)
+
 #execute a section
 effect execute section:
-	when triggered:
+	execute:
 		@intrinsic("execute", section)
 
 
-effect break loop:
+effect:
+	patterns:
+		[break|exit] section
+	execute:
+		@intrinsic("exit", section)
+
+
+effect start chain name:
+	execute:
+		@intrinsic("chain_start", name, the calling section)
+
+effect continue chain name:
+	execute:
+		@intrinsic("chain_continue", name, the calling section)
+
+effect exit chain:
+	execute:
+		@intrinsic("chain_exit", the calling section)
+
+private section execute if condition:
+	execute:
+		@intrinsic("if", condition, the calling section)
+
+#if
+section [if|when] condition:
+	execute:
+		start chain "if"
+		execute if condition:
+			execute the calling section
+			exit chain
+
+section else [if|when] condition:
+	execute:
+		continue chain "if"
+		execute if condition:
+			execute the calling section
+			exit chain
+
+section else:
+	execute:
+		continue chain "if"
+		execute the calling section
+		exit chain
+
+#switch
+
+section switch based on value:
+	execute:
+		set the calling section's switchvalue to value
+
+section case value:
+	execute:
+		if the calling section's parent's switchvalue == value:
+			execute the calling section
+			exit the calling section's parent
+
+section case default:
+	execute:
+		execute the calling section
+		exit the calling section's parent
+
+#ternary
+expression {truevalue} if condition else {falsevalue}:
+	get:
+		if condition:
+			return evaluate truevalue
+		else:
+			return evaluate falsevalue
+
+#async
+section run in background:
+	execute:
+		@intrinsic("run_in_background", the calling section)
+
+expression [the] amount of items in list:
+	get:
+		return @intrinsic("length", list)
+
+expression [the] item at index itemindex of list:
+	get:
+		return @intrinsic("item_at", list, itemindex)
+
+expression [a] random item of list:
+	get:
+		set itemcount to amount of items in list
+		set randomindex to a random integer between 0 and (itemcount - 1)
+		return the item at index randomindex of list
+
+expression for each loopitem in list:
+	get:
+		set itemcount to amount of items in list
+		set itemindex to 0
+		loop while itemindex < itemcount:
+			set loopitem to item at index itemindex
+			execute the calling section
+			add 1 to itemindex
+
+section choose randomly:
+	execute:
+		set options to child sections of the calling section
+		set choice to a random item of options
+		execute choice
+
+#an option of choose randomly
+section option:
+
+
+
+# find section of type
+# find section by stack and section

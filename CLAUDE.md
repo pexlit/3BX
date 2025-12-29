@@ -145,13 +145,13 @@ The 3BX pattern system allows defining new syntax in 3BX itself:
 ```
 pattern:
     syntax: greet name
-    when triggered:
+    execute:
         @intrinsic("print", name)
 ```
 
 ### Pattern Syntax
 - `syntax:` - Natural language template. Reserved words become literals, others become parameters.
-- `when triggered:` - Runtime behavior using intrinsics
+- `execute:` - Runtime behavior using intrinsics
 - `when parsed:` - Compile-time behavior (optional)
 
 **Note:** Patterns are matched by specificity (more literal words = more specific). If two patterns conflict, the compiler will emit an error.

@@ -4,20 +4,20 @@
 
 # Section pattern for if statements - uses execute_if intrinsic
 section if {conditionvalue}:
-    when triggered:
+    execute:
         @intrinsic("execute_if", conditionvalue, section)
 
 # While loop using the loop_while intrinsic
 # The {expression} syntax captures the condition without evaluating it
 # The intrinsic handles the loop directly - no recursive pattern calls needed
 section loop while {condition}:
-    when triggered:
+    execute:
         @intrinsic("loop_while", condition, section)
 
 # Loop N times - implemented using the while loop pattern
 # Uses a counter variable; relies on the loop while pattern above
 section loop loopcount times:
-    when triggered:
+    execute:
         set loopindex to 0
         loop while {loopindex < loopcount}:
             @intrinsic("execute", section)
@@ -25,14 +25,14 @@ section loop loopcount times:
 
 # Do-while loop - executes at least once, then loops while condition is true
 section do then loop while {condition}:
-    when triggered:
+    execute:
         @intrinsic("execute", section)
         @intrinsic("loop_while", condition, section)
 
 # Range loop - loop from start to end (exclusive)
 # Relies on the loop while pattern above
 section loop from startval to endval:
-    when triggered:
+    execute:
         set loopindex to startval
         loop while {loopindex < endval}:
             @intrinsic("execute", section)

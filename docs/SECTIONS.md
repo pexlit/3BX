@@ -13,4 +13,4 @@ expression <pattern>:
 	set to $:
 
 effect <pattern>:
-	when triggered:
+	execute:

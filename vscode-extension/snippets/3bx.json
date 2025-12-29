@@ -3,7 +3,7 @@
     "prefix": "effect",
     "body": [
       "effect ${1:pattern syntax}:",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${2:@intrinsic(\"print\", \"Hello\")}"
     ],
     "description": "Define an effect pattern (side effects, no return value)"
@@ -32,7 +32,7 @@
     "prefix": "section",
     "body": [
       "section ${1:pattern syntax}:",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${2:@intrinsic(\"execute\", section)}"
     ],
     "description": "Define a section pattern (block with indented code)"
@@ -41,7 +41,7 @@
     "prefix": "condition",
     "body": [
       "condition ${1:pattern syntax}:",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${2:@intrinsic(\"branch\", cond)}"
     ],
     "description": "Define a condition pattern"
@@ -51,7 +51,7 @@
     "body": [
       "pattern:",
       "\tsyntax: ${1:pattern_syntax}",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${2:@intrinsic(\"print\", \"Hello\")}"
     ],
     "description": "Define a new pattern with legacy syntax"
@@ -62,7 +62,7 @@
       "pattern:",
       "\tsyntax: ${1:pattern_syntax}",
       "\tpriority: ${2:1}",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${3:@intrinsic(\"print\", \"Hello\")}"
     ],
     "description": "Define a new pattern with explicit priority"
@@ -74,7 +74,7 @@
       "\tsyntax: ${1:pattern_syntax}",
       "\twhen parsed:",
       "\t\t${2:# compile-time behavior}",
-      "\twhen triggered:",
+      "\texecute:",
       "\t\t${3:@intrinsic(\"print\", \"Hello\")}"
     ],
     "description": "Define a pattern with compile-time and runtime behavior"

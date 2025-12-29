@@ -1,0 +1,20 @@
+import print.3bx
+set var to 3
+
+if var < 2:
+	print "var is less than 4"
+else if var < 4:
+	print "var is less than 4"
+else:
+	print "var is not less than 4"
+
+match based on var:
+	case 1:
+		print "var is 1"
+	case 2:
+		print "var is 2"
+	case 3:
+		print "var is 3"
+	case 4:
+		print "var is 4"
+

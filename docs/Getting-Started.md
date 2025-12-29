@@ -40,7 +40,7 @@ brew install llvm cmake
 
 Open your terminal and run:
 ```bash
-git clone https://github.com/yourusername/3BX.git
+git clone https://github.com/pexlit/3BX.git
 cd 3BX
 ```
 

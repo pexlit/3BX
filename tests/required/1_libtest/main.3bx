@@ -11,6 +11,6 @@ multiply testVector by 4.5
 print testVector
 
 effect test:
-	when triggered:
+	execute:
 
 test

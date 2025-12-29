@@ -32,6 +32,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::RBRACE:       return "RBRACE";
         case TokenType::APOSTROPHE:   return "APOSTROPHE";
         case TokenType::AT:           return "AT";
+        case TokenType::SYMBOL:       return "SYMBOL";
         case TokenType::END_OF_FILE:  return "EOF";
         case TokenType::ERROR:        return "ERROR";
         default:                      return "UNKNOWN";

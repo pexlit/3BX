@@ -2,14 +2,14 @@
 
 # Basic print pattern
 effect print value:
-    when triggered:
+    execute:
         @intrinsic("print", value)
 
 effect print value to the console:
-    when triggered:
+    execute:
         @intrinsic("print", value)
 
 # Print with label
 effect print label value:
-    when triggered:
+    execute:
         @intrinsic("print_labeled", label, value)

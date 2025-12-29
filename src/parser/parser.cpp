@@ -281,7 +281,7 @@ StmtPtr Parser::patternDefinition() {
     //     syntax: set var to val
     //     group: GroupName
     //     priority: before $ + $
-    //     when triggered:
+    //     execute:
     //         @intrinsic("store", var, val)
 
     auto def = std::make_unique<PatternDef>();
@@ -289,7 +289,7 @@ StmtPtr Parser::patternDefinition() {
     consume(TokenType::COLON, "Expected ':' after 'pattern'");
     match(TokenType::NEWLINE);
 
-    // Parse pattern properties (syntax, priority, when triggered)
+    // Parse pattern properties (syntax, priority, execute)
     while (!check(TokenType::END_OF_FILE)) {
         // Skip blank lines
         while (match(TokenType::NEWLINE)) {}
@@ -319,7 +319,7 @@ StmtPtr Parser::patternDefinition() {
                 def->when_parsed = parseBlock();
             }
             else if (matchWord("triggered")) {
-                consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                consume(TokenType::COLON, "Expected ':' after 'execute'");
                 match(TokenType::NEWLINE);
                 def->when_triggered = parseBlock();
             }
@@ -550,7 +550,7 @@ StmtPtr Parser::expressionDefinition() {
 
 StmtPtr Parser::effectDefinition() {
     // effect <syntax>:
-    //     when triggered:
+    //     execute:
     //         ...
     // OR (shorthand):
     // effect <syntax>:
@@ -584,9 +584,9 @@ StmtPtr Parser::effectDefinition() {
         return def;
     }
 
-    // Check if body starts with 'when triggered:' or if it's direct statements
+    // Check if body starts with 'execute:' or if it's direct statements
     if (checkWord("when")) {
-        // Parse effect body with 'when triggered:' section
+        // Parse effect body with 'execute:' section
         while (!check(TokenType::END_OF_FILE)) {
             while (match(TokenType::NEWLINE)) {}
 
@@ -595,7 +595,7 @@ StmtPtr Parser::effectDefinition() {
 
             if (matchWord("when")) {
                 if (matchWord("triggered")) {
-                    consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                    consume(TokenType::COLON, "Expected ':' after 'execute'");
                     match(TokenType::NEWLINE);
                     def->when_triggered = parseBlock();
                 }
@@ -627,7 +627,7 @@ StmtPtr Parser::effectDefinition() {
 
 StmtPtr Parser::conditionDefinition() {
     // condition <syntax>:
-    //     when triggered:
+    //     execute:
     //         ...
     // Similar to section but for conditional patterns like "if cond:"
 
@@ -653,7 +653,7 @@ StmtPtr Parser::conditionDefinition() {
     consume(TokenType::COLON, "Expected ':' after condition syntax");
     match(TokenType::NEWLINE);
 
-    // Parse condition body (when triggered, etc.)
+    // Parse condition body (execute, etc.)
     while (!check(TokenType::END_OF_FILE)) {
         while (match(TokenType::NEWLINE)) {}
 
@@ -662,7 +662,7 @@ StmtPtr Parser::conditionDefinition() {
 
         if (matchWord("when")) {
             if (matchWord("triggered")) {
-                consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                consume(TokenType::COLON, "Expected ':' after 'execute'");
                 match(TokenType::NEWLINE);
                 def->when_triggered = parseBlock();
             }
@@ -965,7 +965,7 @@ ExprPtr Parser::lazyExpression() {
 
 StmtPtr Parser::sectionDefinition() {
     // section <syntax>:
-    //     when triggered:
+    //     execute:
     //         ...
     // The section keyword creates a pattern that captures an indented block
     // Syntax: section loop while {condition}:
@@ -1055,7 +1055,7 @@ StmtPtr Parser::sectionDefinition() {
     consume(TokenType::COLON, "Expected ':' after section pattern syntax");
     match(TokenType::NEWLINE);
 
-    // Parse section body (when triggered, etc.)
+    // Parse section body (execute, etc.)
     while (!check(TokenType::END_OF_FILE)) {
         while (match(TokenType::NEWLINE)) {}
 
@@ -1065,7 +1065,7 @@ StmtPtr Parser::sectionDefinition() {
 
         if (matchWord("when")) {
             if (matchWord("triggered")) {
-                consume(TokenType::COLON, "Expected ':' after 'when triggered'");
+                consume(TokenType::COLON, "Expected ':' after 'execute'");
                 match(TokenType::NEWLINE);
                 def->when_triggered = parseBlock();
             }

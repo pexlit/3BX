@@ -9,7 +9,7 @@ This extension provides comprehensive language support for the 3BX programming l
 Full syntax highlighting for 3BX source files (`.3bx`):
 
 - Reserved words (`set`, `to`, `if`, `then`, `else`, `while`, `loop`, `function`, `return`, etc.)
-- Pattern definitions (`pattern:`, `syntax:`, `when triggered:`, `when parsed:`)
+- Pattern definitions (`pattern:`, `syntax:`, `execute:`, `when parsed:`)
 - Intrinsic calls (`@intrinsic(...)`)
 - Strings, numbers, and comments
 - Section headers
@@ -96,7 +96,7 @@ Configure the extension in VS Code settings:
 # Define a greeting pattern
 pattern:
     syntax: greet name
-    when triggered:
+    execute:
         @intrinsic("print", name)
 
 # Use the pattern

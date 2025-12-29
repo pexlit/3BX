@@ -93,7 +93,7 @@ expression length of vec:
 
 # Normalize
 effect normalize vec:
-    when triggered:
+    execute:
         set mag to magnitude of vec
         divide each member of vec by mag
 

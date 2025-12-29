@@ -2,7 +2,7 @@
 
 pattern:
     syntax: greet name
-    when triggered:
+    execute:
         @intrinsic("print", name)
 
 # This should eventually use the pattern

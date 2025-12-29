@@ -33,7 +33,7 @@ Sections define and use patterns. There are two categories:
 These add new syntax to the language:
 
 - `expression:` can be set, get, added to, etc.
-- `event:` defines an event which will trigger all event listeners when triggered
+- `event:` defines an event which will trigger all event listeners execute
 - `effect:` executes code
 
 ### Usage Sections
@@ -47,25 +47,46 @@ These use existing syntax but do not add new patterns:
 
 ### Pattern Syntax
 
-Patterns are built up using required and optional segments. Below are some examples of combinations a pattern can evaluate to:
+Patterns use brackets `[]` with `|` to define alternatives.
+
+**Required choice** - `[a|b]` means the user MUST choose one:
 
 ```
 print [a|the] message:
 ```
 
 This matches:
-- `print message`
 - `print a message`
 - `print the message`
+
+But NOT: `print message` (must have "a" or "the")
+
+**Optional elements** - Use empty alternative `[|word]`:
+
+```
+print [|the] message:
+```
+
+This matches:
+- `print message`
+- `print the message`
+
+### Space Normalization
+
+Spaces in parsed patterns are normalized:
+- Double spaces become single spaces
+- Leading/trailing spaces are removed
+
+So `" print  the   message "` becomes `"print the message"`.
 
 ### Pattern Tree Optimization
 
 The pattern tree should join branches after optional segments to avoid having 200 branches for one pattern with 8 optional segments. When another pattern also uses the same branch, it should split them. Otherwise issues like these occur:
 
 ```
-give [some] bread to dave
+give [|some] bread to dave
 give some bread to jane  # no optional segment! but since the tree wired
-                         # the end of [some] back to the end of give,
+                         # the end of [|some] back to the end of give,
                          # "give bread to jane" will compile incorrectly
 ```
 
@@ -85,7 +106,7 @@ Variables are deduced from `@intrinsic` calls. The arguments in those calls are 
 
 ```
 effect set var to val:
-    when triggered:
+    execute:
         @intrinsic("store", var, val)  # var and val are variables!
 ```
 
@@ -103,7 +124,7 @@ Do the same with patterns that have deduced variables, and repeat step 2 until e
 
 ```
 effect test var:
-    when triggered:
+    execute:
         set var to 1  # since we know 'set var to 1' uses the pattern
                       # 'set $ to $', we can deduce 'var' and '1' as
                       # arguments. Therefore 'var' is a variable!
@@ -129,6 +150,13 @@ The lexer only handles structural elements:
 - Punctuation - `: , ( ) [ ]` etc.
 
 The lexer does NOT categorize words. `set`, `if`, `while`, `function` are all just IDENTIFIERs. The lexer has no concept of keywords.
+
+the lexer divides sentences by anything other than series of a-z or 0-9.
+for example:
+['for', ' ', 'example', ':']
+80%
+['80', '%']
+
 
 ### Parser
 

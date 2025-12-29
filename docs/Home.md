@@ -1,36 +1,46 @@
-# Welcome to 3BX!
+# Welcome to 3BX
 
-**3BX** is a programming language that reads like English. Instead of cryptic symbols and confusing keywords, you write code that actually makes sense!
+**3BX** is a programming language where syntax is defined in the language itself. Instead of hardcoded keywords, you write patterns that teach the language new commands.
 
-## What Makes 3BX Different?
+## Philosophy
 
-Most programming languages look like this:
-```javascript
-let x = 5;
-console.log(x + 3);
-```
+Traditional compilers bake syntax into the compiler. 3BX bakes syntax into the language:
 
-3BX looks like this:
+- The compiler only understands structure (indentation, strings, numbers, words)
+- All syntax comes from patterns defined in `.3bx` files
+- Users can define new syntax without modifying the compiler
+- The language is self-documenting (read `prelude.3bx` to understand syntax)
+
+## What Does 3BX Code Look Like?
+
 ```
 set x to 5
 print x + 3
 ```
 
-See the difference? 3BX uses natural language so you can focus on **what** you want to do, not **how** to write it.
+This works because `prelude.3bx` defines patterns like:
+```
+effect set var to val:
+    execute:
+        @intrinsic("store", var, val)
 
-## The Magic of Patterns
+effect print msg:
+    execute:
+        @intrinsic("print", msg)
+```
 
-The coolest thing about 3BX is that YOU can teach it new commands! These are called "patterns." Want to add a command like `say hello to Alex`? You can create that yourself!
+## The Power of Patterns
+
+You can teach 3BX new commands by defining patterns:
 
 ```
-pattern:
-    syntax: say hello to name
-    when triggered:
+effect say hello to name:
+    execute:
         print "Hello,"
         print name
 ```
 
-Now `say hello to Alex` is a valid command in your program!
+Now `say hello to Alex` is valid syntax.
 
 ## Quick Links
 
@@ -41,31 +51,24 @@ Now `say hello to Alex` is a valid command in your program!
 | [Patterns](Patterns.md) | Create your own custom commands |
 | [Examples](Examples.md) | See what you can build |
 
-## Why Learn 3BX?
+## Why 3BX?
 
-1. **Easy to Read** - Your code looks like normal sentences
-2. **Customizable** - Create your own commands with patterns
-3. **Powerful** - Compiles to super-fast native code using LLVM
-4. **Fun** - Start building cool stuff right away!
+1. **Extensible** - Define new syntax in the language itself
+2. **Readable** - Code looks like natural language
+3. **Powerful** - Compiles to native code using LLVM
+4. **Simple Compiler** - The compiler is just pattern matching
 
 ## Quick Example
 
-Here's a tiny program that calculates and prints a result:
-
 ```
-# My first 3BX program!
-set apples to 5
-set oranges to 3
-set total_fruit to apples + oranges
+# Define a custom pattern
+effect greet person:
+    execute:
+        print "Hello,"
+        print person
 
-print "I have this many fruits:"
-print total_fruit
-```
-
-This will output:
-```
-I have this many fruits:
-8
+# Use it
+greet "World"
 ```
 
 Ready to start? Head over to [Getting Started](Getting-Started.md)!

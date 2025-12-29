@@ -5,23 +5,23 @@
 # Defined first so it can be used in other patterns
 
 effect return val:
-    when triggered:
+    execute:
         @intrinsic("return", val)
 
 # === Variables ===
 
 effect set var to val:
-    when triggered:
+    execute:
         @intrinsic("store", var, val)
 
 # === Output ===
 
 effect write msg to the console:
-    when triggered:
+    execute:
         @intrinsic("print", msg)
 
 effect print msg:
-    when triggered:
+    execute:
         @intrinsic("print", msg)
 
 # === Arithmetic ===
@@ -35,12 +35,12 @@ expression left - right:
         return @intrinsic("sub", left, right)
 
 expression left * right:
-    priority: before left + right
+    priority: before $ + $
     get:
         return @intrinsic("mul", left, right)
 
 expression left / right:
-    priority: before left + right
+    priority: before $ + $
     get:
         return @intrinsic("div", left, right)
 
@@ -48,72 +48,83 @@ expression left / right:
 # These operate AFTER addition (lower priority)
 
 expression val1 is equal to val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_eq", val1, val2)
 
 expression val1 = val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_eq", val1, val2)
 
 expression val1 is less than val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_lt", val1, val2)
 
 expression val1 < val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_lt", val1, val2)
 
 expression val1 is greater than val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_gt", val1, val2)
 
 expression val1 > val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_gt", val1, val2)
 
 expression val1 is less than or equal to val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_lte", val1, val2)
 
 expression val1 <= val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_lte", val1, val2)
 
 expression val1 is greater than or equal to val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_gte", val1, val2)
 
 expression val1 >= val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_gte", val1, val2)
 
 expression val1 is not equal to val2:
-    priority: after val1 + val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_neq", val1, val2)
 
-expression val1 != val2:
-    priority: after val1 + val2
+expression:
+	patterns:
+		val1 != val2
+		val1 <> val2
+		val1 isn't [equal to|] val2
+    priority: after $ + $
     get:
         return @intrinsic("cmp_neq", val1, val2)
 
 # === Control Flow ===
 
 condition if cond:
-    when triggered:
+    execute:
         @intrinsic("branch", cond)
 
 condition if cond then:
-    when triggered:
+    execute:
         @intrinsic("branch", cond)
 
+expression true:
+	get:
+		return 1
+
+expression false:
+	get:
+		return 0

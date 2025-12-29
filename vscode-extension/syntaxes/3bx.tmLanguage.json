@@ -233,7 +233,7 @@
           ]
         },
         {
-          "comment": "When triggered block header",
+          "comment": "execute block header",
           "name": "meta.pattern.when-triggered.3bx",
           "match": "^(\\s+)(when)\\s+(triggered)\\s*(:)\\s*$",
           "captures": {

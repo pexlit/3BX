@@ -41,6 +41,7 @@ enum class TokenType {
 
     // Special
     AT,
+    SYMBOL,  // Any single character not otherwise recognized
     END_OF_FILE,
     ERROR
 };

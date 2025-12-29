@@ -6,7 +6,7 @@ expression var's next power of two:
 			multiply result by 2
 
 effect say message:
-	when triggered:
+	execute:
 		print message
 
 class:

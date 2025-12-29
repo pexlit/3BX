@@ -1,242 +1,188 @@
-# Patterns - Create Your Own Commands
+# Patterns - Create Your Own Syntax
 
-Patterns are the superpower of 3BX! They let you teach the language new commands that look like plain English. This is what makes 3BX unique.
+Patterns are how 3BX defines syntax. All language constructs - from `set x to 5` to `print "hello"` - are patterns defined in `.3bx` files.
 
-## What's a Pattern?
+## How Patterns Work
 
-Think of a pattern as teaching 3BX a new trick. You define what the command looks like and what it should do.
+When you write `set x to 5`, the compiler:
+1. Tokenizes into: `IDENTIFIER("set") IDENTIFIER("x") IDENTIFIER("to") NUMBER(5)`
+2. Matches against registered patterns
+3. Finds `effect set var to val:` from prelude.3bx
+4. Executes its body with `var=x` and `val=5`
 
-For example, you could teach 3BX what "say hello" means:
+The compiler has no hardcoded keywords. Words like "set" and "to" only have meaning because they appear in pattern definitions.
 
-```
-pattern:
-    syntax: say hello
-    when triggered:
-        print "Hello there!"
-```
+## Pattern Types
 
-Now you can use it in your program:
-```
-say hello
-```
+### Effect Patterns (Do Something)
 
-And it prints: `Hello there!`
-
-## The Structure of a Pattern
-
-Every pattern has three parts:
+Effects perform actions:
 
 ```
-pattern:
-    syntax: your command here
-    when triggered:
-        what happens when the command runs
-```
-
-1. **`pattern:`** - Tells 3BX "I'm defining a new command"
-2. **`syntax:`** - What the command looks like when you type it
-3. **`when triggered:`** - What the command actually does
-
-## Patterns with Parameters
-
-The real power comes when you add **parameters** - values that the user fills in. Any word in your syntax becomes a parameter when you use it:
-
-```
-pattern:
-    syntax: greet name
-    when triggered:
+effect greet name:
+    execute:
         print "Hello,"
         print name
 ```
 
-Now you can use it like this:
-```
-greet "Alex"
-greet "Sam"
-greet "Taylor"
-```
-
-Each time, `name` gets replaced with whatever you put there!
-
-## Reserved Words
-
-Some words have special meaning in 3BX and stay fixed in your pattern:
-
-`set`, `to`, `if`, `then`, `else`, `while`, `loop`, `is`, `the`, `a`, `an`, `and`, `or`, `not`, `return`, `import`
-
-These words become part of your pattern's structure:
-
-```
-pattern:
-    syntax: add x to y
-    when triggered:
-        # "to" is reserved, so only x and y are parameters
-        print x + y
-```
-
-Usage:
-```
-add 5 to 10    # Prints: 15
-```
-
-## Types of Patterns
-
-### Effect Patterns (Do Something)
-
-These patterns DO something, like print or save:
-
-```
-effect greet name nicely:
-    when triggered:
-        print "Hello there,"
-        print name
-        print "Nice to see you!"
-```
+Usage: `greet "Alex"`
 
 ### Expression Patterns (Calculate Something)
 
-These patterns CALCULATE a value that you can use:
+Expressions return values:
 
 ```
 expression double of x:
     get:
-        x * 2
+        return x * 2
+```
+
+Usage: `set result to double of 5`
+
+### Condition Patterns
+
+Conditions control flow:
+
+```
+condition if cond:
+    execute:
+        @intrinsic("branch", cond)
 ```
 
 Usage:
 ```
-set result to double of 5
-print result    # Prints: 10
+if x > 5:
+    print "big"
 ```
 
-### Section Patterns (Contain Code Blocks)
+## Pattern Syntax with Alternatives
 
-These patterns contain other code inside them:
+Use brackets `[]` with `|` to define alternatives:
+
+### Required Choice
+
+`[a|b]` means the user MUST choose either `a` or `b`:
 
 ```
-section repeat count times:
-    when triggered:
-        set i to 0
-        loop while {i < count}:
-            @intrinsic("execute", section)
-            set i to i + 1
+effect set [the|a] variable to val:
+    execute:
+        @intrinsic("store", variable, val)
 ```
 
-Usage:
+This matches:
+- `set the variable to 5`
+- `set a variable to 5`
+
+But NOT: `set variable to 5` (must have "the" or "a")
+
+### Optional Elements
+
+Use an empty alternative `[|word]` to make something optional:
+
 ```
-repeat 3 times:
-    print "Hip hip hooray!"
+effect print [|the] message:
+    execute:
+        @intrinsic("print", message)
 ```
+
+This matches:
+- `print message`
+- `print the message`
+
+### Multiple Options
+
+```
+effect show [the|a|an] item:
+    execute:
+        @intrinsic("print", item)
+```
+
+Matches: `show the item`, `show a item`, `show an item`
+
+### Space Normalization
+
+Spaces in patterns are normalized:
+- Double spaces become single spaces
+- Leading/trailing spaces are removed
+
+So `print  the   message ` becomes `print the message`.
+
+## Variables in Patterns
+
+Variables are deduced from `@intrinsic` calls:
+
+```
+effect set var to val:
+    execute:
+        @intrinsic("store", var, val)
+```
+
+The arguments to `@intrinsic` (`var`, `val`) are identified as variables. Everything else in the syntax (`set`, `to`) becomes a literal that must match exactly.
 
 ## Intrinsics - The Building Blocks
 
-Intrinsics are the basic operations that patterns are built from. Think of them as the "atoms" of 3BX:
+Intrinsics are primitive operations the compiler understands:
 
 | Intrinsic | What It Does |
 |-----------|--------------|
 | `@intrinsic("print", val)` | Print a value |
 | `@intrinsic("store", var, val)` | Store a value in a variable |
-| `@intrinsic("load", var)` | Get a value from a variable |
 | `@intrinsic("add", a, b)` | Add two numbers |
 | `@intrinsic("sub", a, b)` | Subtract b from a |
 | `@intrinsic("mul", a, b)` | Multiply two numbers |
 | `@intrinsic("div", a, b)` | Divide a by b |
-| `@intrinsic("execute", section)` | Run a section of code |
+| `@intrinsic("return", val)` | Return a value |
+| `@intrinsic("branch", cond)` | Conditional branch |
 
-Here's how `print` is actually defined:
+## Priority
 
-```
-effect print value:
-    when triggered:
-        @intrinsic("print", value)
-```
-
-## A Complete Example: Custom Math
-
-Let's create some natural language math commands:
+When patterns could conflict, use `priority:` to specify order:
 
 ```
-# Define our patterns
-pattern:
-    syntax: add a and b
-    when triggered:
-        @intrinsic("add", a, b)
-
-pattern:
-    syntax: the sum of a and b
-    when triggered:
-        @intrinsic("add", a, b)
-
-pattern:
-    syntax: multiply a by b
-    when triggered:
-        @intrinsic("mul", a, b)
-
-pattern:
-    syntax: the product of a and b
-    when triggered:
-        @intrinsic("mul", a, b)
-
-# Now use them!
-set result1 to add 10 and 5
-print result1    # 15
-
-set result2 to the sum of 20 and 30
-print result2    # 50
-
-set result3 to multiply 7 by 8
-print result3    # 56
-
-set result4 to the product of 3 and 4
-print result4    # 12
+expression left * right:
+    priority: before left + right
+    get:
+        return @intrinsic("mul", left, right)
 ```
 
-See how natural that reads? You're writing math in English!
+This ensures `*` binds tighter than `+`.
 
-## Another Example: Area Calculations
+## Complete Example: Custom Math
 
 ```
-pattern:
-    syntax: the area of rectangle with width w and height h
-    when triggered:
-        @intrinsic("mul", w, h)
+# Natural language addition
+expression add a and b:
+    get:
+        return @intrinsic("add", a, b)
 
-pattern:
-    syntax: the area of square with side s
-    when triggered:
-        @intrinsic("mul", s, s)
+# Natural language subtraction
+expression subtract b from a:
+    get:
+        return @intrinsic("sub", a, b)
 
-# Calculate some areas
-set room_area to the area of rectangle with width 10 and height 15
-print "Room area:"
-print room_area    # 150
+# Use them
+set result to add 10 and 5
+print result    # 15
 
-set tile_area to the area of square with side 5
-print "Tile area:"
-print tile_area    # 25
+set diff to subtract 3 from 10
+print diff      # 7
 ```
 
-## Tips for Writing Great Patterns
+## How Pattern Matching Works
 
-1. **Make them readable** - Write patterns that sound like normal sentences
-   - Good: `the area of rectangle with width x and height y`
-   - Not as good: `rect area x y`
+1. The compiler collects all patterns from imported files
+2. For each statement, it tries to match against registered patterns
+3. The most specific pattern wins (more literal words = more specific)
+4. If two patterns match equally, the compiler reports an error
 
-2. **Use descriptive parameter names**
-   - Good: `greet person_name with message`
-   - Not as good: `greet n with m`
+## Tips
 
-3. **Keep them focused** - Each pattern should do one thing well
-
-4. **Use reserved words** - Words like `the`, `and`, `with`, `to` make patterns more readable
-
-5. **Test as you go** - Try your pattern right after writing it to make sure it works
-
-## How 3BX Chooses Between Patterns
-
-If two patterns could match the same input, 3BX picks the more specific one (the one with more reserved/literal words). If they're equally specific, you'll get an error.
+1. **Make patterns readable** - They should sound like natural sentences
+2. **Use descriptive variable names** - `person_name` not `n`
+3. **Keep patterns focused** - Each pattern should do one thing
+4. **Test as you go** - Try your pattern immediately after writing it
 
 ## What's Next?
 
-- [Examples](Examples.md) - See patterns used in real programs
+- [Examples](Examples.md) - See patterns in action
 - [Writing Your First Program](Writing-Your-First-Program.md) - Back to basics

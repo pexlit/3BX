@@ -90,10 +90,11 @@ Token Lexer::nextToken() {
                 advance();
                 return makeToken(TokenType::NOT_EQUALS, "!=");
             }
-            return makeToken(TokenType::ERROR, "!");
+            return makeToken(TokenType::SYMBOL, "!");
     }
 
-    return makeToken(TokenType::ERROR, std::string(1, c));
+    // Any other character becomes a SYMBOL token
+    return makeToken(TokenType::SYMBOL, std::string(1, c));
 }
 
 Token Lexer::peek() {

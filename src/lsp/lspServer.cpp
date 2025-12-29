@@ -684,8 +684,8 @@ JsonValue LspServer::handleHover(const JsonValue& params) {
     std::unordered_map<std::string, std::string> keywordDocs = {
         {"pattern", "**pattern:**\n\nDefines a new syntax pattern that can be used in code."},
         {"syntax", "**syntax:**\n\nSpecifies the pattern's syntax template. Reserved words become literals, others become parameters."},
-        {"when", "**when triggered/parsed:**\n\nDefines behavior when pattern is triggered (runtime) or parsed (compile-time)."},
-        {"triggered", "**when triggered:**\n\nRuntime behavior using intrinsics."},
+        {"when", "**execute/parsed:**\n\nDefines behavior when pattern is triggered (runtime) or parsed (compile-time)."},
+        {"triggered", "**execute:**\n\nRuntime behavior using intrinsics."},
         {"parsed", "**when parsed:**\n\nCompile-time behavior (optional)."},
         {"set", "**set variable to value**\n\nAssigns a value to a variable."},
         {"if", "**if condition then**\n\nConditional statement."},

@@ -3,42 +3,42 @@
 
 # Listening to events
 effect on eventName: handlerBody:
-    when triggered:
+    execute:
         @intrinsic("register_handler", eventName, handlerBody)
 
 effect when eventName: handlerBody:
-    when triggered:
+    execute:
         @intrinsic("register_handler", eventName, handlerBody)
 
 effect listen for eventName: handlerBody:
-    when triggered:
+    execute:
         @intrinsic("register_handler", eventName, handlerBody)
 
 # Firing events
 effect fire eventName:
-    when triggered:
+    execute:
         @intrinsic("fire_event", eventName)
 
 effect trigger eventName:
-    when triggered:
+    execute:
         @intrinsic("fire_event", eventName)
 
 effect emit eventName:
-    when triggered:
+    execute:
         @intrinsic("fire_event", eventName)
 
 # Firing with data
 effect fire eventName with eventData:
-    when triggered:
+    execute:
         @intrinsic("fire_event_with_data", eventName, eventData)
 
 effect trigger eventName with eventData:
-    when triggered:
+    execute:
         @intrinsic("fire_event_with_data", eventName, eventData)
 
 # Cancelling events
 effect cancel the event:
-    when triggered:
+    execute:
         @intrinsic("cancel_current_event")
 
 expression event is cancelled:
@@ -47,16 +47,16 @@ expression event is cancelled:
 
 # One-time handlers
 effect once eventName: handlerBody:
-    when triggered:
+    execute:
         @intrinsic("register_once_handler", eventName, handlerBody)
 
 # Removing handlers
 effect stop listening for eventName:
-    when triggered:
+    execute:
         @intrinsic("remove_handler", eventName)
 
 effect remove all handlers for eventName:
-    when triggered:
+    execute:
         @intrinsic("remove_all_handlers", eventName)
 
 # Accessing event data in handlers
