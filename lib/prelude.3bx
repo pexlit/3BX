@@ -16,11 +16,7 @@ effect set var to val:
 
 # === Output ===
 
-effect write msg to the console:
-    execute:
-        @intrinsic("print", msg)
-
-effect print msg:
+effect [print|write] msg [|to the console]:
     execute:
         @intrinsic("print", msg)
 
@@ -47,79 +43,68 @@ expression left / right:
 # === Comparison ===
 # These operate AFTER addition (lower priority)
 
-expression val1 is equal to val2:
+expression val1 [is equal to|=] val2:
     priority: after $ + $
     get:
         return @intrinsic("cmp_eq", val1, val2)
 
-expression val1 = val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_eq", val1, val2)
-
-expression val1 is less than val2:
+expression val1 [is less than|<] val2:
     priority: after $ + $
     get:
         return @intrinsic("cmp_lt", val1, val2)
 
-expression val1 < val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_lt", val1, val2)
-
-expression val1 is greater than val2:
+expression val1 [is greater than|>] val2:
     priority: after $ + $
     get:
         return @intrinsic("cmp_gt", val1, val2)
 
-expression val1 > val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_gt", val1, val2)
-
-expression val1 is less than or equal to val2:
+expression val1 [is less than or equal to|<=] val2:
     priority: after $ + $
     get:
         return @intrinsic("cmp_lte", val1, val2)
 
-expression val1 <= val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_lte", val1, val2)
-
-expression val1 is greater than or equal to val2:
+expression val1 [is greater than or equal to|>=] val2:
     priority: after $ + $
     get:
         return @intrinsic("cmp_gte", val1, val2)
-
-expression val1 >= val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_gte", val1, val2)
-
-expression val1 is not equal to val2:
-    priority: after $ + $
-    get:
-        return @intrinsic("cmp_neq", val1, val2)
 
 expression:
 	patterns:
 		val1 != val2
 		val1 <> val2
 		val1 isn't [equal to|] val2
+		val1 is not equal to val2
     priority: after $ + $
     get:
         return @intrinsic("cmp_neq", val1, val2)
 
+# === Compound Assignment ===
+
+effect multiply var by val:
+    execute:
+        set var to var * val
+
+effect add val to var:
+    execute:
+        set var to var + val
+
+effect subtract val from var:
+    execute:
+        set var to var - val
+
+effect divide var by val:
+    execute:
+        set var to var / val
+
 # === Control Flow ===
 
-condition if cond:
+condition if cond [|then]:
     execute:
         @intrinsic("branch", cond)
 
-condition if cond then:
+section while {condition}:
     execute:
-        @intrinsic("branch", cond)
+        @intrinsic("loop_while", condition, the calling section)
 
 expression true:
 	get:
@@ -128,3 +113,9 @@ expression true:
 expression false:
 	get:
 		return 0
+
+# === Compile-time Assertions ===
+
+effect [make sure|verify] that {expression:cond}:
+    when parsed:
+        @intrinsic("assert_compile_time", cond)

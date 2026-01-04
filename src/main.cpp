@@ -1,14 +1,16 @@
 #include "lexer/lexer.hpp"
-#include "parser/parser.hpp"
-#include "semantic/semantic.hpp"
-#include "codegen/codegen.hpp"
+#include "compiler/optimizer.hpp"
 #include "lsp/lspServer.hpp"
 #include "dap/dapServer.hpp"
+#include "compiler/importResolver.hpp"
+#include "compiler/sectionAnalyzer.hpp"
+#include "compiler/patternResolver.hpp"
+#include "compiler/typeInference.hpp"
+#include "compiler/codeGenerator.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <set>
 #include <filesystem>
 
 // LLVM JIT includes
@@ -20,15 +22,30 @@
 namespace fs = std::filesystem;
 
 void printUsage(const char* program) {
-    std::cerr << "Usage: " << program << " <source_file.3bx>\n";
-    std::cerr << "       " << program << " --emit-ir <source_file.3bx>\n";
+    std::cerr << "Usage: " << program << " [options] <source_file.3bx>\n";
     std::cerr << "       " << program << " --lsp [--debug]\n";
     std::cerr << "       " << program << " --dap [--debug]\n";
-    std::cerr << "\nOptions:\n";
-    std::cerr << "  --emit-ir    Output LLVM IR instead of compiling\n";
-    std::cerr << "  --lsp        Start Language Server Protocol mode\n";
-    std::cerr << "  --dap        Start Debug Adapter Protocol mode\n";
-    std::cerr << "  --debug      Enable debug logging (with --lsp or --dap)\n";
+    std::cerr << "\nCompilation Options:\n";
+    std::cerr << "  -o <file>       Write output to <file>\n";
+    std::cerr << "  -O0             No optimization (for debugging)\n";
+    std::cerr << "  -O1             Basic optimizations\n";
+    std::cerr << "  -O2             Standard optimizations (default)\n";
+    std::cerr << "  -O3             Aggressive optimizations\n";
+    std::cerr << "  --emit-llvm     Output LLVM IR (.ll) instead of binary\n";
+    std::cerr << "  --emit-asm      Output assembly (.s) instead of binary\n";
+    std::cerr << "  --emit-obj      Output object file (.o) instead of executable\n";
+    std::cerr << "  -c              Same as --emit-obj\n";
+    std::cerr << "  -S              Same as --emit-asm\n";
+    std::cerr << "\nDebug/Analysis Options:\n";
+    std::cerr << "  --emit-ir       Output LLVM IR to stdout (legacy, use --emit-llvm)\n";
+    std::cerr << "  --analyze       Run import resolution and section analysis (Steps 1-2)\n";
+    std::cerr << "  --resolve       Run pattern resolution (Steps 1-3)\n";
+    std::cerr << "  --typecheck     Run type inference (Steps 1-4)\n";
+    std::cerr << "  --codegen       Run code generation (Steps 1-5) - output LLVM IR\n";
+    std::cerr << "\nServer Modes:\n";
+    std::cerr << "  --lsp           Start Language Server Protocol mode\n";
+    std::cerr << "  --dap           Start Debug Adapter Protocol mode\n";
+    std::cerr << "  --debug         Enable debug logging (with --lsp or --dap)\n";
 }
 
 std::string readFile(const std::string& path) {
@@ -41,202 +58,11 @@ std::string readFile(const std::string& path) {
     return buffer.str();
 }
 
-// Get the directory where the compiler executable is located
-std::string getExecutableDir() {
-    return fs::canonical("/proc/self/exe").parent_path().string();
-}
-
-// Resolve import path relative to source file or lib directory
-std::string resolveImport(const std::string& importPath, const std::string& sourceFile) {
-    fs::path sourceDir = fs::path(sourceFile).parent_path();
-    if (sourceDir.empty()) sourceDir = ".";
-
-    // Try relative to source file first
-    fs::path relativePath = sourceDir / importPath;
-    if (fs::exists(relativePath)) {
-        return relativePath.string();
-    }
-
-    // Try lib directory relative to source
-    fs::path libPath = sourceDir / "lib" / importPath;
-    if (fs::exists(libPath)) {
-        return libPath.string();
-    }
-
-    // Search up the directory tree for lib folder (up to 5 levels)
-    fs::path searchDir = sourceDir;
-    for (int i = 0; i < 5; i++) {
-        libPath = searchDir / "lib" / importPath;
-        if (fs::exists(libPath)) {
-            return fs::canonical(libPath).string();
-        }
-        fs::path parent = searchDir.parent_path();
-        if (parent == searchDir) break; // Reached root
-        searchDir = parent;
-    }
-
-    // Try lib directory relative to executable (for installed compiler)
-    std::string exeDir = getExecutableDir();
-    libPath = fs::path(exeDir) / ".." / "lib" / importPath;
-    if (fs::exists(libPath)) {
-        return fs::canonical(libPath).string();
-    }
-
-    // Try lib directory next to executable
-    libPath = fs::path(exeDir) / "lib" / importPath;
-    if (fs::exists(libPath)) {
-        return libPath.string();
-    }
-
-    // Return original path, let it fail later with proper error
-    return importPath;
-}
-
-// Extract import paths from a file using lightweight lexing
-std::vector<std::string> extractImports(const std::string& source, const std::string& filePath) {
-    std::vector<std::string> imports;
-    tbx::Lexer lexer(source, filePath);
-
-    while (true) {
-        auto token = lexer.nextToken();
-        if (token.type == tbx::TokenType::END_OF_FILE) break;
-
-        if (token.lexeme == "import") {
-            // Check if next token is 'function' (skip import function declarations)
-            auto next = lexer.peek();
-            if (next.lexeme == "function") {
-                continue;
-            }
-
-            // Collect import path
-            std::string path;
-            while (true) {
-                auto pathToken = lexer.nextToken();
-                if (pathToken.type == tbx::TokenType::NEWLINE ||
-                    pathToken.type == tbx::TokenType::END_OF_FILE) {
-                    break;
-                }
-                path += pathToken.lexeme;
-            }
-            if (!path.empty()) {
-                imports.push_back(path);
-            }
-        }
-        else if (token.lexeme == "use") {
-            // use <name> from <path>
-            // Skip to 'from'
-            while (true) {
-                auto t = lexer.nextToken();
-                if (t.lexeme == "from") {
-                    break;
-                }
-                if (t.type == tbx::TokenType::NEWLINE ||
-                    t.type == tbx::TokenType::END_OF_FILE) {
-                    break;
-                }
-            }
-            // Collect path after 'from'
-            std::string path;
-            while (true) {
-                auto pathToken = lexer.nextToken();
-                if (pathToken.type == tbx::TokenType::NEWLINE ||
-                    pathToken.type == tbx::TokenType::END_OF_FILE) {
-                    break;
-                }
-                path += pathToken.lexeme;
-            }
-            if (!path.empty()) {
-                imports.push_back(path);
-            }
-        }
-    }
-    return imports;
-}
-
-// Phase 1: Collect all files and their imports (depth-first)
-void collectFiles(
-    const std::string& filePath,
-    std::set<std::string>& visitedFiles,
-    std::vector<std::string>& orderedFiles
-) {
-    fs::path canonical = fs::weakly_canonical(filePath);
-    std::string canonicalPath = canonical.string();
-
-    if (visitedFiles.count(canonicalPath)) {
-        return;
-    }
-    visitedFiles.insert(canonicalPath);
-
-    // Read and extract imports
-    std::string source = readFile(filePath);
-    auto imports = extractImports(source, filePath);
-
-    // Process imports first (depth-first)
-    for (const auto& importPath : imports) {
-        std::string resolved = resolveImport(importPath, filePath);
-        collectFiles(resolved, visitedFiles, orderedFiles);
-    }
-
-    // Add this file after its imports
-    orderedFiles.push_back(canonicalPath);
-}
-
-// Parse a file and collect its imports recursively
-// Uses shared registry to accumulate patterns across files
-#include "pattern/pattern_resolution.hpp"
-
-// ... (keep includes consistent)
-
-void parseWithImports(
-    const std::string& filePath,
-    std::set<std::string>& parsedFiles,
-    std::vector<tbx::StmtPtr>& allStatements,
-    tbx::PatternRegistry& sharedRegistry,
-    const std::string& originalSource
-) {
-    // ... Phase 1 ...
-    std::set<std::string> visitedFiles;
-    std::vector<std::string> orderedFiles;
-
-    // Auto-load prelude.3bx
-    std::string preludePath = resolveImport("prelude.3bx", filePath);
-    if (fs::exists(preludePath)) {
-        collectFiles(preludePath, visitedFiles, orderedFiles);
-    } else {
-        std::cerr << "Warning: prelude.3bx not found in library paths.\n";
-    }
-
-    collectFiles(filePath, visitedFiles, orderedFiles);
-
-    // Phase 2: Parse files in order
-    for (const auto& file : orderedFiles) {
-        if (parsedFiles.count(file)) {
-            continue;
-        }
-        parsedFiles.insert(file);
-
-        // Read and parse the file
-        std::string source = readFile(file);
-        tbx::Lexer lexer(source, file);
-        tbx::Parser parser(lexer);
-
-        parser.setSharedRegistry(&sharedRegistry);
-
-        auto program = parser.parse();
-
-        // Add non-import statements
-        for (auto& stmt : program->statements) {
-            if (!dynamic_cast<tbx::ImportStmt*>(stmt.get()) &&
-                !dynamic_cast<tbx::UseStmt*>(stmt.get())) {
-                allStatements.push_back(std::move(stmt));
-            }
-        }
-        
-        // Resolve newly added patterns so they are available for subsequent files
-        // This calculates variables, specificity, and priorities
-        tbx::PatternResolver resolver(sharedRegistry);
-        resolver.resolveAll();
-    }
+// Helper to derive output filename from source file
+std::string deriveOutputPath(const std::string& sourceFile, const std::string& extension) {
+    fs::path sourcePath(sourceFile);
+    fs::path outputPath = sourcePath.parent_path() / sourcePath.stem();
+    return outputPath.string() + extension;
 }
 
 // Run the compiled module using LLVM ORC JIT
@@ -279,27 +105,64 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    bool emitIr = false;
+    bool emitIr = false;           // Legacy: output IR to stdout
+    bool emitLlvm = false;         // Output IR to file
+    bool emitAsm = false;          // Output assembly to file
+    bool emitObj = false;          // Output object file
     bool lspMode = false;
     bool dapMode = false;
     bool debugMode = false;
+    bool analyzeMode = false;
+    bool resolveMode = false;
+    bool typecheckMode = false;
+    bool codegenMode = false;
     std::string sourceFile;
+    std::string outputFile;
+    tbx::OptimizationLevel optimizationLevel = tbx::OptimizationLevel::O2;
 
     for (int argIndex = 1; argIndex < argc; argIndex++) {
         std::string arg = argv[argIndex];
         if (arg == "--emit-ir") {
             emitIr = true;
+        } else if (arg == "--emit-llvm") {
+            emitLlvm = true;
+        } else if (arg == "--emit-asm" || arg == "-S") {
+            emitAsm = true;
+        } else if (arg == "--emit-obj" || arg == "-c") {
+            emitObj = true;
+        } else if (arg == "-o" && argIndex + 1 < argc) {
+            outputFile = argv[++argIndex];
+        } else if (arg == "-O0") {
+            optimizationLevel = tbx::OptimizationLevel::O0;
+        } else if (arg == "-O1") {
+            optimizationLevel = tbx::OptimizationLevel::O1;
+        } else if (arg == "-O2") {
+            optimizationLevel = tbx::OptimizationLevel::O2;
+        } else if (arg == "-O3") {
+            optimizationLevel = tbx::OptimizationLevel::O3;
         } else if (arg == "--lsp") {
             lspMode = true;
         } else if (arg == "--dap") {
             dapMode = true;
         } else if (arg == "--debug") {
             debugMode = true;
+        } else if (arg == "--analyze") {
+            analyzeMode = true;
+        } else if (arg == "--resolve") {
+            resolveMode = true;
+        } else if (arg == "--typecheck") {
+            typecheckMode = true;
+        } else if (arg == "--codegen") {
+            codegenMode = true;
         } else if (arg == "--help" || arg == "-h") {
             printUsage(argv[0]);
             return 0;
-        } else {
+        } else if (arg[0] != '-') {
             sourceFile = arg;
+        } else {
+            std::cerr << "Unknown option: " << arg << "\n";
+            printUsage(argv[0]);
+            return 1;
         }
     }
 
@@ -325,44 +188,409 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // Create shared pattern registry for all files
-        tbx::PatternRegistry sharedRegistry;
+        // Handle analyze mode (new pipeline: Steps 1-2)
+        if (analyzeMode) {
+            // Step 1: Import Resolution
+            std::cout << "=== Step 1: Import Resolution ===\n\n";
+            fs::path sourcePathAbs = fs::absolute(sourceFile);
+            tbx::ImportResolver resolver(sourcePathAbs.parent_path().string());
+            std::string mergedSource = resolver.resolveWithPrelude(sourcePathAbs.string());
 
-        // Parse main file and all imports recursively
-        std::set<std::string> parsedFiles;
-        std::vector<tbx::StmtPtr> allStatements;
-        parseWithImports(sourceFile, parsedFiles, allStatements, sharedRegistry, sourceFile);
+            if (!resolver.diagnostics().empty()) {
+                for (const auto& diagnostic : resolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
 
-        // Create combined program
-        auto program = std::make_unique<tbx::Program>();
-        program->statements = std::move(allStatements);
+            std::cout << "Resolved files:\n";
+            for (const auto& file : resolver.resolvedFiles()) {
+                std::cout << "  - " << file << "\n";
+            }
+            std::cout << "\n";
 
-        // Semantic analysis
-        tbx::SemanticAnalyzer analyzer;
-        if (!analyzer.analyze(*program)) {
-            for (const auto& err : analyzer.errors()) {
-                std::cerr << "Error: " << err << "\n";
+            // Step 2: Section Analysis
+            std::cout << "=== Step 2: Section Analysis ===\n\n";
+            tbx::SectionAnalyzer analyzer;
+            // Convert SourceMap type
+            std::map<int, tbx::SectionAnalyzer::SourceLocation> sectionSourceMap;
+            for(const auto& [line, loc] : resolver.sourceMap()) {
+                sectionSourceMap[line] = {loc.filePath, loc.lineNumber};
+            }
+            auto rootSection = analyzer.analyze(mergedSource, sectionSourceMap);
+
+            if (!analyzer.diagnostics().empty()) {
+                for (const auto& diagnostic : analyzer.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Section Tree:\n";
+            rootSection->print(0);
+
+            return 0;
+        }
+
+        // Handle resolve mode (new pipeline: Steps 1-3)
+        if (resolveMode) {
+            // Step 1: Import Resolution
+            std::cout << "=== Step 1: Import Resolution ===\n\n";
+            fs::path sourcePathAbs = fs::absolute(sourceFile);
+            tbx::ImportResolver importResolver(sourcePathAbs.parent_path().string());
+            std::string mergedSource = importResolver.resolveWithPrelude(sourcePathAbs.string());
+
+            if (!importResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : importResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Resolved files:\n";
+            for (const auto& file : importResolver.resolvedFiles()) {
+                std::cout << "  - " << file << "\n";
+            }
+            std::cout << "\n";
+
+            // Step 2: Section Analysis
+            std::cout << "=== Step 2: Section Analysis ===\n\n";
+            tbx::SectionAnalyzer sectionAnalyzer;
+            // Convert SourceMap type
+            std::map<int, tbx::SectionAnalyzer::SourceLocation> sectionSourceMap;
+            for(const auto& [line, loc] : importResolver.sourceMap()) {
+                sectionSourceMap[line] = {loc.filePath, loc.lineNumber};
+            }
+            auto rootSection = sectionAnalyzer.analyze(mergedSource, sectionSourceMap);
+
+            if (!sectionAnalyzer.diagnostics().empty()) {
+                for (const auto& diagnostic : sectionAnalyzer.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Section Tree:\n";
+            rootSection->print(0);
+            std::cout << "\n";
+
+            // Step 3: Pattern Resolution
+            std::cout << "=== Step 3: Pattern Resolution ===\n\n";
+            tbx::SectionPatternResolver patternResolver;
+            bool resolved = patternResolver.resolve(rootSection.get());
+
+            if (!patternResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : patternResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            patternResolver.printResults();
+
+            if (resolved) {
+                std::cout << "\nAll patterns resolved successfully.\n";
+            } else {
+                std::cout << "\nSome patterns could not be resolved.\n";
+            }
+
+            return resolved ? 0 : 1;
+        }
+
+        // Handle typecheck mode (new pipeline: Steps 1-4)
+        if (typecheckMode) {
+            // Step 1: Import Resolution
+            std::cout << "=== Step 1: Import Resolution ===\n\n";
+            fs::path sourcePathAbs = fs::absolute(sourceFile);
+            tbx::ImportResolver importResolver(sourcePathAbs.parent_path().string());
+            std::string mergedSource = importResolver.resolveWithPrelude(sourcePathAbs.string());
+
+            if (!importResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : importResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Resolved files:\n";
+            for (const auto& file : importResolver.resolvedFiles()) {
+                std::cout << "  - " << file << "\n";
+            }
+            std::cout << "\n";
+
+            // Step 2: Section Analysis
+            std::cout << "=== Step 2: Section Analysis ===\n\n";
+            tbx::SectionAnalyzer sectionAnalyzer;
+            // Convert SourceMap type
+            std::map<int, tbx::SectionAnalyzer::SourceLocation> sectionSourceMap;
+            for(const auto& [line, loc] : importResolver.sourceMap()) {
+                sectionSourceMap[line] = {loc.filePath, loc.lineNumber};
+            }
+            auto rootSection = sectionAnalyzer.analyze(mergedSource, sectionSourceMap);
+
+            if (!sectionAnalyzer.diagnostics().empty()) {
+                for (const auto& diagnostic : sectionAnalyzer.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Section Tree:\n";
+            rootSection->print(0);
+            std::cout << "\n";
+
+            // Step 3: Pattern Resolution
+            std::cout << "=== Step 3: Pattern Resolution ===\n\n";
+            tbx::SectionPatternResolver patternResolver;
+            bool resolved = patternResolver.resolve(rootSection.get());
+
+            if (!patternResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : patternResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            patternResolver.printResults();
+            std::cout << "\n";
+
+            // Step 4: Type Inference
+            std::cout << "=== Step 4: Type Inference ===\n\n";
+            tbx::TypeInference typeInference;
+            bool typed = typeInference.infer(patternResolver);
+
+            if (!typeInference.diagnostics().empty()) {
+                for (const auto& diagnostic : typeInference.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            typeInference.printResults();
+
+            if (resolved && typed) {
+                std::cout << "\nAll patterns resolved and typed successfully.\n";
+            } else if (!resolved) {
+                std::cout << "\nSome patterns could not be resolved.\n";
+            } else {
+                std::cout << "\nSome types could not be inferred.\n";
+            }
+
+            return (resolved && typed) ? 0 : 1;
+        }
+
+        // Handle codegen mode (new pipeline: Steps 1-5)
+        if (codegenMode) {
+            // Step 1: Import Resolution
+            std::cout << "=== Step 1: Import Resolution ===\n\n";
+            fs::path sourcePathAbs = fs::absolute(sourceFile);
+            tbx::ImportResolver importResolver(sourcePathAbs.parent_path().string());
+            std::string mergedSource = importResolver.resolveWithPrelude(sourcePathAbs.string());
+
+            if (!importResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : importResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Resolved files:\n";
+            for (const auto& file : importResolver.resolvedFiles()) {
+                std::cout << "  - " << file << "\n";
+            }
+            std::cout << "\n";
+
+            // Step 2: Section Analysis
+            std::cout << "=== Step 2: Section Analysis ===\n\n";
+            tbx::SectionAnalyzer sectionAnalyzer;
+            // Convert SourceMap type
+            std::map<int, tbx::SectionAnalyzer::SourceLocation> sectionSourceMap;
+            for(const auto& [line, loc] : importResolver.sourceMap()) {
+                sectionSourceMap[line] = {loc.filePath, loc.lineNumber};
+            }
+            auto rootSection = sectionAnalyzer.analyze(mergedSource, sectionSourceMap);
+
+            if (!sectionAnalyzer.diagnostics().empty()) {
+                for (const auto& diagnostic : sectionAnalyzer.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            std::cout << "Section Tree:\n";
+            rootSection->print(0);
+            std::cout << "\n";
+
+            // Step 3: Pattern Resolution
+            std::cout << "=== Step 3: Pattern Resolution ===\n\n";
+            tbx::SectionPatternResolver patternResolver;
+            bool resolved = patternResolver.resolve(rootSection.get());
+
+            if (!patternResolver.diagnostics().empty()) {
+                for (const auto& diagnostic : patternResolver.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            patternResolver.printResults();
+
+            if (!resolved) {
+                std::cout << "\nSome patterns could not be resolved.\n";
+                return 1;
+            }
+            std::cout << "\nAll patterns resolved successfully.\n\n";
+
+            // Step 4 & 5: Type Inference and Code Generation
+            std::cout << "=== Steps 4-5: Type Inference and Code Generation ===\n\n";
+            tbx::SectionCodeGenerator codeGenerator(sourceFile);
+            bool generated = codeGenerator.generate(patternResolver, rootSection.get());
+
+            if (!codeGenerator.diagnostics().empty()) {
+                for (const auto& diagnostic : codeGenerator.diagnostics()) {
+                    std::cerr << diagnostic.toString() << "\n";
+                }
+            }
+
+            if (!generated) {
+                std::cout << "Code generation failed.\n";
+                return 1;
+            }
+
+            std::cout << "Generated LLVM IR:\n\n";
+            codeGenerator.printIr();
+
+            return 0;
+        }
+
+        // =========================================================================
+        // Default compilation path - New Pipeline
+        // =========================================================================
+        
+        // Step 1: Import Resolution
+        fs::path sourcePathAbs = fs::absolute(sourceFile);
+        tbx::ImportResolver importResolver(sourcePathAbs.parent_path().string());
+        std::string mergedSource = importResolver.resolveWithPrelude(sourcePathAbs.string());
+
+        if (!importResolver.diagnostics().empty()) {
+            for (const auto& diagnostic : importResolver.diagnostics()) {
+                std::cerr << diagnostic.toString() << "\n";
             }
             return 1;
         }
 
-        // Code generation
-        tbx::CodeGenerator codegen(sourceFile);
-        codegen.setPatternRegistry(&sharedRegistry);
-        if (!codegen.generate(*program)) {
-            std::cerr << "Error: Code generation failed\n";
+        // Step 2: Section Analysis
+        tbx::SectionAnalyzer sectionAnalyzer;
+        // Convert SourceMap type
+        std::map<int, tbx::SectionAnalyzer::SourceLocation> sectionSourceMap;
+        for(const auto& [line, loc] : importResolver.sourceMap()) {
+            sectionSourceMap[line] = {loc.filePath, loc.lineNumber};
+        }
+        auto rootSection = sectionAnalyzer.analyze(mergedSource, sectionSourceMap);
+
+        if (!sectionAnalyzer.diagnostics().empty()) {
+            for (const auto& diagnostic : sectionAnalyzer.diagnostics()) {
+                std::cerr << diagnostic.toString() << "\n";
+            }
             return 1;
         }
 
+        // Step 3: Pattern Resolution
+        tbx::SectionPatternResolver patternResolver;
+        bool resolved = patternResolver.resolve(rootSection.get());
+
+        if (!patternResolver.diagnostics().empty()) {
+            for (const auto& diagnostic : patternResolver.diagnostics()) {
+                std::cerr << diagnostic.toString() << "\n";
+            }
+        }
+
+        if (!resolved) {
+            std::cerr << "Error: Some patterns could not be resolved.\n";
+            return 1;
+        }
+
+        // Steps 4-5: Type Inference and Code Generation
+        tbx::SectionCodeGenerator codeGenerator(sourceFile);
+        bool generated = codeGenerator.generate(patternResolver, rootSection.get());
+
+        if (!codeGenerator.diagnostics().empty()) {
+            for (const auto& diagnostic : codeGenerator.diagnostics()) {
+                std::cerr << diagnostic.toString() << "\n";
+            }
+        }
+
+        if (!generated) {
+            std::cerr << "Error: Code generation failed.\n";
+            return 1;
+        }
+
+        // Legacy: emit IR to stdout (unoptimized)
         if (emitIr) {
-            codegen.getModule()->print(llvm::outs(), nullptr);
+            codeGenerator.printIr();
             return 0;
         }
 
-        // Run the compiled code using JIT
-        auto context = codegen.takeContext();
-        auto module = codegen.takeModule();
-        return runJit(std::move(context), std::move(module));
+        // Get the module for optimization/output
+        llvm::Module* module = codeGenerator.getModule();
+
+        // Step 6: Optimization and Output
+        tbx::Optimizer optimizer(optimizationLevel);
+
+        // Apply optimizations
+        if (!optimizer.optimize(*module)) {
+            for (const auto& err : optimizer.errors()) {
+                std::cerr << "Optimization Error: " << err << "\n";
+            }
+            return 1;
+        }
+
+        // Handle file output modes
+        if (emitLlvm || emitAsm || emitObj) {
+            // Determine output file path
+            std::string outPath = outputFile;
+
+            if (emitLlvm) {
+                if (outPath.empty()) {
+                    outPath = deriveOutputPath(sourceFile, ".ll");
+                }
+                if (!optimizer.emitLlvmIr(*module, outPath)) {
+                    for (const auto& err : optimizer.errors()) {
+                        std::cerr << "Error: " << err << "\n";
+                    }
+                    return 1;
+                }
+                std::cout << "Wrote LLVM IR to " << outPath << "\n";
+            } else if (emitAsm) {
+                if (outPath.empty()) {
+                    outPath = deriveOutputPath(sourceFile, ".s");
+                }
+                if (!optimizer.emitAssembly(*module, outPath)) {
+                    for (const auto& err : optimizer.errors()) {
+                        std::cerr << "Error: " << err << "\n";
+                    }
+                    return 1;
+                }
+                std::cout << "Wrote assembly to " << outPath << "\n";
+            } else if (emitObj) {
+                if (outPath.empty()) {
+                    outPath = deriveOutputPath(sourceFile, ".o");
+                }
+                if (!optimizer.emitObjectFile(*module, outPath)) {
+                    for (const auto& err : optimizer.errors()) {
+                        std::cerr << "Error: " << err << "\n";
+                    }
+                    return 1;
+                }
+                std::cout << "Wrote object file to " << outPath << "\n";
+            }
+            return 0;
+        }
+
+        // If -o is specified without emit flags, generate an executable
+        if (!outputFile.empty()) {
+            if (!optimizer.emitExecutable(*module, outputFile)) {
+                for (const auto& err : optimizer.errors()) {
+                    std::cerr << "Error: " << err << "\n";
+                }
+                return 1;
+            }
+            std::cout << "Wrote executable to " << outputFile << "\n";
+            return 0;
+        }
+
+        // Default: run the compiled code using JIT
+        auto context = codeGenerator.takeContext();
+        auto jitModule = codeGenerator.takeModule();
+        return runJit(std::move(context), std::move(jitModule));
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

@@ -1,15 +1,11 @@
 # vector.3bx - Vector class for 3D mathematics
 # A fundamental data structure for games, physics, and graphics
 
-import class.3bx
-
 class:
     pattern:
         vector
     members:
         x, y, z
-    when created:
-        set each member to 0
 
 # Vector creation with values
 expression a vector with x as xVal and y as yVal and z as zVal:
@@ -58,18 +54,20 @@ expression divide vec by scalar:
         return result
 
 # Dot product (needs explicit member access)
-expression dot product of vecA and vecB:
+expression:
+    patterns:
+        [the] dot product of vecA and vecB
+        vecA dot vecB
     get:
         set sum to x of vecA * x of vecB
         set sum to sum + y of vecA * y of vecB
         return sum + z of vecA * z of vecB
 
-expression vecA dot vecB:
-    get:
-        return the dot product of vecA and vecB
-
 # Cross product (needs explicit member access due to cross terms)
-expression cross product of vecA and vecB:
+expression:
+    patterns:
+        [the] cross product of vecA and vecB
+        vecA cross vecB
     get:
         set result to a new vector
         set x of result to y of vecA * z of vecB - z of vecA * y of vecB
@@ -77,19 +75,14 @@ expression cross product of vecA and vecB:
         set z of result to x of vecA * y of vecB - y of vecA * x of vecB
         return result
 
-expression vecA cross vecB:
-    get:
-        return the cross product of vecA and vecB
-
-# Magnitude
-expression magnitude of vec:
+# Magnitude / Length
+expression:
+    patterns:
+        [the] magnitude of vec
+        [the] length of vec
     get:
         set squared to x of vec * x of vec + y of vec * y of vec + z of vec * z of vec
         return @intrinsic("sqrt", squared)
-
-expression length of vec:
-    get:
-        return the magnitude of vec
 
 # Normalize
 effect normalize vec:

@@ -1,8 +1,22 @@
-# 1 section up = the calling section of the calling section.
+# 1 section up = the calling section
 # lines with a colon belong to the section below them.
-expression number section[s|] up:
+expression framecount frame[s|] back:
 	get:
-		return @intrinsic("section", number)
+		return @intrinsic("frame", framecount + 1)
+
+expression the current frame:
+	get:
+		return 1 frame back
+
+expression the calling frame:
+	get:
+		return 2 frames back
+
+expression sectioncount section[s|] up [|from frame]:
+	get:
+		if frame isn't set:
+			set frame to the calling frame
+		return @intrinsic("section", the calling frame, sectioncount)
 
 #the section in which 'the current section' is referenced, so the calling section of this expression section (1 up).
 expression [the current|this|] [section|loop|statement]:
@@ -72,7 +86,7 @@ section else:
 
 #switch
 
-section switch based on value:
+section [switch|match] based on value:
 	execute:
 		set the calling section's switchvalue to value
 

@@ -6,28 +6,38 @@ expression a new className:
     get:
         return @intrinsic("create_instance", className)
 
-# Accessing members
-expression [the] memberName of object:
+# Check if an object has a member with a given name
+expression obj has [|a] member [named|] {word:memberName}:
     get:
-        return @intrinsic("get_member", object, memberName)
-	set to value:
-		@intrinsic("set_member", object, memberName, value)
+        return @intrinsic("has_member", obj, memberName)
 
-# represents a list of members. will return a list of references to members
+# Accessing members using word capture
+# The {word:member} captures a single identifier as a string
 expression:
-	patterns:
-		each member
-		all members
+    patterns:
+        [the] {word:member} of obj
+        obj's {word:member}
+    when parsed:
+        make sure that obj has member named member
+    get:
+        @intrinsic("member_access", obj, member)
+    set to value:
+        @intrinsic("member_set", obj, member, value)
+
+# Represents a list of members - returns a list of references to members
+expression:
+    patterns:
+        each member
+        all members
     used inside:
         class
     set to val:
         @intrinsic("set_each_member", val)
     add val:
-		loop 
         @intrinsic("add_each_member", val)
-    substract val:
+    subtract val:
         @intrinsic("sub_each_member", val)
-    multiplied by val:
+    multiply by val:
         @intrinsic("mul_each_member", val)
     divide by val:
         @intrinsic("div_each_member", val)

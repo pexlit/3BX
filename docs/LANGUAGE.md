@@ -26,15 +26,16 @@ Code should use as few special characters as possible (so custom patterns can us
 
 ## Sections
 
-Sections define and use patterns. There are two categories:
+Sections define and use patterns. See [SECTIONS.md](SECTIONS.md) for the complete reference of section types and their required subsections.
 
 ### Definition Sections
 
 These add new syntax to the language:
 
-- `expression:` can be set, get, added to, etc.
-- `event:` defines an event which will trigger all event listeners execute
-- `effect:` executes code
+- `expression <pattern>:` can be set, get, added to, etc. (requires `get:` subsection)
+- `effect <pattern>:` executes code (requires `execute:` subsection)
+- `section <pattern>:` defines a named section (requires `execute:` subsection)
+- `class <pattern>:` defines a class type (has `patterns:` and `members:` subsections)
 
 ### Usage Sections
 
@@ -96,99 +97,37 @@ In that case, split the branches: duplicate `bread to dave` to the `some` branch
 
 To return a value in an expression, use either `set result to x` or `return x`.
 
-## Variable Deduction
+## Typed Captures
 
-Variables don't need special characters for indication. Instead, variables are deduced as follows:
+Patterns can use typed captures to control how arguments are matched:
 
-### Step 1: Intrinsic Analysis
+| Syntax | Matching | Use Case |
+|--------|----------|----------|
+| `$` or plain word | Greedy expression | Most arguments |
+| `{expression:name}` | Greedy, lazy evaluation | Control flow (while, if) |
+| `{word:name}` | Non-greedy, single identifier | Member access, reflection |
 
-Variables are deduced from `@intrinsic` calls. The arguments in those calls are guaranteed to be variables.
+### Expression Captures
+
+`{expression:name}` captures an expression without evaluating it. The expression is re-evaluated each time it's used, in the caller's scope:
 
 ```
-effect set var to val:
+section while {expression:condition}:
     execute:
-        @intrinsic("store", var, val)  # var and val are variables!
+        @intrinsic("loop_while", condition, the calling section)
 ```
 
-### Step 2: Pattern Incorporation
+### Word Captures
 
-Incorporate those variables into the patterns of the expressions and effects they are in:
-
-```
-effect set $ to $
-```
-
-### Step 3: Propagation
-
-Do the same with patterns that have deduced variables, and repeat step 2 until every variable has been resolved.
+`{word:name}` captures a single identifier as a string (non-greedy):
 
 ```
-effect test var:
-    execute:
-        set var to 1  # since we know 'set var to 1' uses the pattern
-                      # 'set $ to $', we can deduce 'var' and '1' as
-                      # arguments. Therefore 'var' is a variable!
-                      # This effect's deduced pattern becomes 'test $'
+expression {word:member} of obj:
+    get:
+        @intrinsic("member_access", obj, member)
 ```
 
-## Compiler Design
-
-The compiler has two jobs:
-
-1. Tokenize structure (indentation, strings, numbers, words, punctuation)
-2. Match tokens against patterns defined in .3bx files
-
-### Lexer
-
-The lexer only handles structural elements:
-
-- `INDENT` / `DEDENT` - indentation changes
-- `NEWLINE` - line endings
-- `STRING` - quoted text
-- `NUMBER` - numeric literals
-- `IDENTIFIER` - any word (no exceptions)
-- Punctuation - `: , ( ) [ ]` etc.
-
-The lexer does NOT categorize words. `set`, `if`, `while`, `function` are all just IDENTIFIERs. The lexer has no concept of keywords.
-
-the lexer divides sentences by anything other than series of a-z or 0-9.
-for example:
-['for', ' ', 'example', ':']
-80%
-['80', '%']
-
-
-### Parser
-
-The parser matches token sequences against registered patterns. It does not have hardcoded grammar rules.
-
-When parsing a line like `set x to 5`:
-
-1. The lexer produces: `IDENTIFIER("set") IDENTIFIER("x") IDENTIFIER("to") NUMBER(5)`
-2. The parser tries to match this against all registered patterns
-3. The pattern `set $ to $` from prelude.3bx matches
-4. `set` and `to` are matched as literals because they appear literally in the pattern
-5. `x` and `5` are captured as variables because they match `$` positions
-
-### Anti-Patterns
-
-The compiler must NOT:
-
-- Have hardcoded keywords in the lexer
-- Have reserved word lists anywhere
-- Have special token types for `if`, `set`, `while`, etc.
-- Have hardcoded grammar rules for control flow or declarations
-- Have expression precedence rules in the parser (precedence comes from patterns)
-
-If you find yourself adding a keyword check or special case for a word, you are doing it wrong. Define a pattern in prelude.3bx instead.
-
-### Design Philosophy
-
-Traditional compilers bake syntax into the compiler. 3BX bakes syntax into the language. This means:
-
-- Users can define new syntax without modifying the compiler
-- The compiler is simpler (just pattern matching)
-- The language is self-documenting (read prelude.3bx to understand syntax)
+This matches `x of player` where `member` = "x" (as a string, not a variable reference).
 
 ## Testing
 

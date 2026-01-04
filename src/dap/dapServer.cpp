@@ -1,8 +1,5 @@
 #include "dap/dapServer.hpp"
-#include "interpreter/interpreter.hpp"
 #include "lexer/lexer.hpp"
-#include "parser/parser.hpp"
-#include "pattern/pattern_registry.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -11,7 +8,7 @@
 
 namespace tbx {
 
-DapServer::DapServer() : interpreter_(std::make_unique<Interpreter>()) {}
+DapServer::DapServer() {}
 DapServer::~DapServer() = default;
 
 void DapServer::run() {
@@ -24,15 +21,15 @@ void DapServer::run() {
                 break;
             }
 
-            JsonValue json = JsonValue::parse(message);
-            std::string type = json["type"].asString();
+            nlohmann::json request = nlohmann::json::parse(message);
+            std::string type = request["type"].get<std::string>();
 
             if (type == "request") {
-                std::string command = json["command"].asString();
-                int seq = json["seq"].asInt();
-                JsonValue args = json["arguments"];
+                std::string command = request["command"].get<std::string>();
+                int seq = request["seq"].get<int>();
+                nlohmann::json args = request.value("arguments", nlohmann::json::object());
 
-                JsonValue result = handleRequest(command, args, seq);
+                nlohmann::json result = handleRequest(command, args, seq);
 
                 if (command == "disconnect") {
                     break;
@@ -96,46 +93,46 @@ void DapServer::writeMessage(const std::string& content) {
 }
 
 void DapServer::sendResponse(int requestSeq, bool success, const std::string& command,
-                             const JsonValue& body, const std::string& message) {
-    JsonValue response = JsonValue::object();
-    response.set("seq", sequenceNumber_++);
-    response.set("type", "response");
-    response.set("request_seq", requestSeq);
-    response.set("success", success);
-    response.set("command", command);
+                             const nlohmann::json& body, const std::string& message) {
+    nlohmann::json response = nlohmann::json::object();
+    response["seq"] = sequenceNumber_++;
+    response["type"] = "response";
+    response["request_seq"] = requestSeq;
+    response["success"] = success;
+    response["command"] = command;
 
-    if (!body.isNull()) {
-        response.set("body", body);
+    if (!body.is_null()) {
+        response["body"] = body;
     }
 
     if (!message.empty()) {
-        response.set("message", message);
+        response["message"] = message;
     }
 
-    writeMessage(response.serialize());
+    writeMessage(response.dump());
 }
 
-void DapServer::sendEvent(const std::string& event, const JsonValue& body) {
-    JsonValue eventMsg = JsonValue::object();
-    eventMsg.set("seq", sequenceNumber_++);
-    eventMsg.set("type", "event");
-    eventMsg.set("event", event);
+void DapServer::sendEvent(const std::string& event, const nlohmann::json& body) {
+    nlohmann::json eventMsg = nlohmann::json::object();
+    eventMsg["seq"] = sequenceNumber_++;
+    eventMsg["type"] = "event";
+    eventMsg["event"] = event;
 
-    if (!body.isNull()) {
-        eventMsg.set("body", body);
+    if (!body.is_null()) {
+        eventMsg["body"] = body;
     }
 
-    writeMessage(eventMsg.serialize());
+    writeMessage(eventMsg.dump());
 }
 
 void DapServer::sendStoppedEvent(const std::string& reason, const std::string& description) {
-    JsonValue body = JsonValue::object();
-    body.set("reason", reason);
-    body.set("threadId", 1);
-    body.set("allThreadsStopped", true);
+    nlohmann::json body = nlohmann::json::object();
+    body["reason"] = reason;
+    body["threadId"] = 1;
+    body["allThreadsStopped"] = true;
 
     if (!description.empty()) {
-        body.set("description", description);
+        body["description"] = description;
     }
 
     sendEvent("stopped", body);
@@ -146,9 +143,9 @@ void DapServer::sendTerminatedEvent() {
 }
 
 void DapServer::sendOutputEvent(const std::string& category, const std::string& output) {
-    JsonValue body = JsonValue::object();
-    body.set("category", category);
-    body.set("output", output);
+    nlohmann::json body = nlohmann::json::object();
+    body["category"] = category;
+    body["output"] = output;
     sendEvent("output", body);
 }
 
@@ -158,11 +155,11 @@ void DapServer::log(const std::string& message) {
     }
 }
 
-JsonValue DapServer::handleRequest(const std::string& command, const JsonValue& args, int seq) {
+nlohmann::json DapServer::handleRequest(const std::string& command, const nlohmann::json& args, int seq) {
     log("Request: " + command);
 
     if (command == "initialize") {
-        JsonValue result = handleInitialize(args);
+        nlohmann::json result = handleInitialize(args);
         sendResponse(seq, true, command, result);
 
         // Send initialized event
@@ -171,140 +168,142 @@ JsonValue DapServer::handleRequest(const std::string& command, const JsonValue& 
     }
 
     if (command == "launch") {
-        JsonValue result = handleLaunch(args);
-        sendResponse(seq, !result.isNull() || launched_, command, result,
+        nlohmann::json result = handleLaunch(args);
+        sendResponse(seq, !result.is_null() || launched_, command, result,
                      launched_ ? "" : "Launch failed");
         return result;
     }
 
     if (command == "setBreakpoints") {
-        JsonValue result = handleSetBreakpoints(args);
+        nlohmann::json result = handleSetBreakpoints(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "configurationDone") {
-        JsonValue result = handleConfigurationDone(args);
+        nlohmann::json result = handleConfigurationDone(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "threads") {
-        JsonValue result = handleThreads(args);
+        nlohmann::json result = handleThreads(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "stackTrace") {
-        JsonValue result = handleStackTrace(args);
+        nlohmann::json result = handleStackTrace(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "scopes") {
-        JsonValue result = handleScopes(args);
+        nlohmann::json result = handleScopes(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "variables") {
-        JsonValue result = handleVariables(args);
+        nlohmann::json result = handleVariables(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "continue") {
-        JsonValue result = handleContinue(args);
+        nlohmann::json result = handleContinue(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "next") {
-        JsonValue result = handleNext(args);
+        nlohmann::json result = handleNext(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "stepIn") {
-        JsonValue result = handleStepIn(args);
+        nlohmann::json result = handleStepIn(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "stepOut") {
-        JsonValue result = handleStepOut(args);
+        nlohmann::json result = handleStepOut(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "pause") {
-        JsonValue result = handlePause(args);
+        nlohmann::json result = handlePause(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "disconnect") {
-        JsonValue result = handleDisconnect(args);
+        nlohmann::json result = handleDisconnect(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     if (command == "evaluate") {
-        JsonValue result = handleEvaluate(args);
+        nlohmann::json result = handleEvaluate(args);
         sendResponse(seq, true, command, result);
         return result;
     }
 
     // Unknown command
     log("Unknown command: " + command);
-    sendResponse(seq, false, command, JsonValue(), "Unknown command: " + command);
-    return JsonValue();
+    sendResponse(seq, false, command, nlohmann::json(), "Unknown command: " + command);
+    return nlohmann::json();
 }
 
-JsonValue DapServer::handleInitialize(const JsonValue& args) {
+nlohmann::json DapServer::handleInitialize(const nlohmann::json& args) {
     initialized_ = true;
 
     // Return capabilities
-    JsonValue capabilities = JsonValue::object();
-    capabilities.set("supportsConfigurationDoneRequest", true);
-    capabilities.set("supportsFunctionBreakpoints", false);
-    capabilities.set("supportsConditionalBreakpoints", false);
-    capabilities.set("supportsHitConditionalBreakpoints", false);
-    capabilities.set("supportsEvaluateForHovers", true);
-    capabilities.set("supportsStepBack", false);
-    capabilities.set("supportsSetVariable", false);
-    capabilities.set("supportsRestartFrame", false);
-    capabilities.set("supportsGotoTargetsRequest", false);
-    capabilities.set("supportsStepInTargetsRequest", false);
-    capabilities.set("supportsCompletionsRequest", false);
-    capabilities.set("supportsModulesRequest", false);
-    capabilities.set("supportsExceptionOptions", false);
-    capabilities.set("supportsValueFormattingOptions", false);
-    capabilities.set("supportsExceptionInfoRequest", false);
-    capabilities.set("supportTerminateDebuggee", true);
-    capabilities.set("supportsDelayedStackTraceLoading", false);
-    capabilities.set("supportsLoadedSourcesRequest", false);
-    capabilities.set("supportsLogPoints", false);
-    capabilities.set("supportsTerminateThreadsRequest", false);
-    capabilities.set("supportsSetExpression", false);
-    capabilities.set("supportsTerminateRequest", true);
+    nlohmann::json capabilities = nlohmann::json::object();
+    capabilities["supportsConfigurationDoneRequest"] = true;
+    capabilities["supportsFunctionBreakpoints"] = false;
+    capabilities["supportsConditionalBreakpoints"] = false;
+    capabilities["supportsHitConditionalBreakpoints"] = false;
+    capabilities["supportsEvaluateForHovers"] = false;
+    capabilities["supportsStepBack"] = false;
+    capabilities["supportsSetVariable"] = false;
+    capabilities["supportsRestartFrame"] = false;
+    capabilities["supportsGotoTargetsRequest"] = false;
+    capabilities["supportsStepInTargetsRequest"] = false;
+    capabilities["supportsCompletionsRequest"] = false;
+    capabilities["supportsModulesRequest"] = false;
+    capabilities["supportsExceptionOptions"] = false;
+    capabilities["supportsValueFormattingOptions"] = false;
+    capabilities["supportsExceptionInfoRequest"] = false;
+    capabilities["supportTerminateDebuggee"] = true;
+    capabilities["supportsDelayedStackTraceLoading"] = false;
+    capabilities["supportsLoadedSourcesRequest"] = false;
+    capabilities["supportsLogPoints"] = false;
+    capabilities["supportsTerminateThreadsRequest"] = false;
+    capabilities["supportsSetExpression"] = false;
+    capabilities["supportsTerminateRequest"] = true;
 
     return capabilities;
 }
 
-JsonValue DapServer::handleLaunch(const JsonValue& args) {
-    sourceFile_ = args["program"].asString();
+nlohmann::json DapServer::handleLaunch(const nlohmann::json& args) {
+    if (args.contains("program")) {
+        sourceFile_ = args["program"].get<std::string>();
+    }
 
     if (sourceFile_.empty()) {
         sendOutputEvent("stderr", "Error: No program specified in launch configuration\n");
-        return JsonValue();
+        return nlohmann::json();
     }
 
     // Read source file
     std::ifstream file(sourceFile_);
     if (!file) {
         sendOutputEvent("stderr", "Error: Cannot open file: " + sourceFile_ + "\n");
-        return JsonValue();
+        return nlohmann::json();
     }
 
     std::stringstream buffer;
@@ -313,298 +312,142 @@ JsonValue DapServer::handleLaunch(const JsonValue& args) {
 
     sendOutputEvent("console", "Loading: " + sourceFile_ + "\n");
 
-    try {
-        // Create pattern registry (owned by DapServer for lifetime)
-        patternRegistry_ = std::make_unique<PatternRegistry>();
+    // TODO: The old interpreter has been removed.
+    // Debugging needs to be re-implemented with the new compiler pipeline.
+    sendOutputEvent("stderr", "Debug mode is not yet available with the new compiler pipeline.\n");
+    sendOutputEvent("stderr", "Please use regular compilation (./build/3bx <file>) to run your program.\n");
 
-        // Parse the program
-        Lexer lexer(sourceContent_, sourceFile_);
-        Parser parser(lexer);
-        parser.setSharedRegistry(patternRegistry_.get());
-
-        auto program = parser.parse();
-
-        // Load into interpreter with pattern registry for pattern matching
-        interpreter_->load(program.release());
-        interpreter_->setPatternRegistry(patternRegistry_.get());
-
-        // Set up callbacks
-        interpreter_->setBreakpointCallback([this](const SourceLocation& loc) {
-            return shouldBreak(loc);
-        });
-
-        interpreter_->setOutputCallback([this](const std::string& text) {
-            sendOutputEvent("stdout", text);
-        });
-
-        launched_ = true;
-        state_ = DebugState::Paused;
-
-        sendOutputEvent("console", "Program loaded successfully\n");
-
-    } catch (const std::exception& e) {
-        sendOutputEvent("stderr", "Error loading program: " + std::string(e.what()) + "\n");
-        return JsonValue();
-    }
-
-    return JsonValue::object();
+    return nlohmann::json();
 }
 
-JsonValue DapServer::handleSetBreakpoints(const JsonValue& args) {
-    JsonValue source = args["source"];
-    std::string path = source["path"].asString();
+nlohmann::json DapServer::handleSetBreakpoints(const nlohmann::json& args) {
+    nlohmann::json source = args["source"];
+    std::string path = source["path"].get<std::string>();
 
     // Clear existing breakpoints for this source
     breakpoints_[path].clear();
 
-    JsonValue result = JsonValue::object();
-    JsonValue breakpointsArray = JsonValue::array();
+    nlohmann::json result = nlohmann::json::object();
+    nlohmann::json breakpointsArray = nlohmann::json::array();
 
-    if (args.has("breakpoints")) {
-        const auto& bps = args["breakpoints"].asArray();
-        for (const auto& bp : bps) {
-            int line = bp["line"].asInt();
+    if (args.contains("breakpoints")) {
+        for (const auto& bp : args["breakpoints"]) {
+            int line = bp["line"].get<int>();
 
             Breakpoint newBp;
             newBp.id = nextBreakpointId_++;
             newBp.source = path;
             newBp.line = line;
-            newBp.verified = true;
+            newBp.verified = false; // Not verified since debugging is not implemented
 
             breakpoints_[path].push_back(newBp);
 
-            JsonValue bpResult = JsonValue::object();
-            bpResult.set("id", newBp.id);
-            bpResult.set("verified", true);
-            bpResult.set("line", line);
-            breakpointsArray.push(bpResult);
+            nlohmann::json bpResult = nlohmann::json::object();
+            bpResult["id"] = newBp.id;
+            bpResult["verified"] = false;
+            bpResult["line"] = line;
+            breakpointsArray.push_back(bpResult);
         }
     }
 
-    result.set("breakpoints", breakpointsArray);
+    result["breakpoints"] = breakpointsArray;
     return result;
 }
 
-JsonValue DapServer::handleConfigurationDone(const JsonValue& args) {
-    // Start execution in a separate thread
-    if (launched_) {
-        std::thread executionThread([this]() {
-            startExecution();
-        });
-        executionThread.detach();
-    }
-
-    return JsonValue::object();
+nlohmann::json DapServer::handleConfigurationDone(const nlohmann::json& args) {
+    // Debugging not implemented - send terminated event
+    sendTerminatedEvent();
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handleThreads(const JsonValue& args) {
-    JsonValue result = JsonValue::object();
-    JsonValue threads = JsonValue::array();
+nlohmann::json DapServer::handleThreads(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    nlohmann::json threads = nlohmann::json::array();
 
-    JsonValue thread = JsonValue::object();
-    thread.set("id", 1);
-    thread.set("name", "main");
-    threads.push(thread);
+    nlohmann::json thread = nlohmann::json::object();
+    thread["id"] = 1;
+    thread["name"] = "main";
+    threads.push_back(thread);
 
-    result.set("threads", threads);
+    result["threads"] = threads;
     return result;
 }
 
-JsonValue DapServer::handleStackTrace(const JsonValue& args) {
-    JsonValue result = JsonValue::object();
-    JsonValue stackFrames = JsonValue::array();
+nlohmann::json DapServer::handleStackTrace(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    nlohmann::json stackFrames = nlohmann::json::array();
 
-    const auto& callStack = interpreter_->callStack();
-    int frameId = 1;
-
-    for (auto it = callStack.rbegin(); it != callStack.rend(); ++it) {
-        JsonValue frame = JsonValue::object();
-        frame.set("id", frameId++);
-        frame.set("name", it->name);
-        frame.set("line", (int)it->location.line);
-        frame.set("column", (int)it->location.column);
-
-        JsonValue source = JsonValue::object();
-        source.set("name", it->location.filename);
-        source.set("path", it->location.filename);
-        frame.set("source", source);
-
-        stackFrames.push(frame);
-    }
-
-    result.set("stackFrames", stackFrames);
-    result.set("totalFrames", (int)callStack.size());
+    // No stack frames since debugging is not implemented
+    result["stackFrames"] = stackFrames;
+    result["totalFrames"] = 0;
     return result;
 }
 
-JsonValue DapServer::handleScopes(const JsonValue& args) {
-    int frameId = args["frameId"].asInt();
-
-    JsonValue result = JsonValue::object();
-    JsonValue scopes = JsonValue::array();
-
-    // Locals scope
-    JsonValue locals = JsonValue::object();
-    locals.set("name", "Locals");
-    locals.set("variablesReference", 1);
-    locals.set("expensive", false);
-    scopes.push(locals);
-
-    // Globals scope
-    JsonValue globals = JsonValue::object();
-    globals.set("name", "Globals");
-    globals.set("variablesReference", 2);
-    globals.set("expensive", false);
-    scopes.push(globals);
-
-    result.set("scopes", scopes);
+nlohmann::json DapServer::handleScopes(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    nlohmann::json scopes = nlohmann::json::array();
+    result["scopes"] = scopes;
     return result;
 }
 
-JsonValue DapServer::handleVariables(const JsonValue& args) {
-    int variablesRef = args["variablesReference"].asInt();
-
-    JsonValue result = JsonValue::object();
-    JsonValue variables = JsonValue::array();
-
-    std::vector<std::pair<std::string, Value>> vars;
-
-    if (variablesRef == 1) {
-        vars = interpreter_->getLocals();
-    } else if (variablesRef == 2) {
-        vars = interpreter_->getGlobals();
-    }
-
-    for (const auto& varPair : vars) {
-        JsonValue var = JsonValue::object();
-        var.set("name", varPair.first);
-        var.set("value", varPair.second.toString());
-        var.set("type", varPair.second.typeName());
-        var.set("variablesReference", 0);
-        variables.push(var);
-    }
-
-    result.set("variables", variables);
+nlohmann::json DapServer::handleVariables(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    nlohmann::json variables = nlohmann::json::array();
+    result["variables"] = variables;
     return result;
 }
 
-JsonValue DapServer::handleContinue(const JsonValue& args) {
-    continueExecution();
-
-    JsonValue result = JsonValue::object();
-    result.set("allThreadsContinued", true);
+nlohmann::json DapServer::handleContinue(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    result["allThreadsContinued"] = true;
     return result;
 }
 
-JsonValue DapServer::handleNext(const JsonValue& args) {
-    stepExecution(StepType::Over);
-
-    JsonValue result = JsonValue::object();
-    return result;
+nlohmann::json DapServer::handleNext(const nlohmann::json& args) {
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handleStepIn(const JsonValue& args) {
-    stepExecution(StepType::In);
-
-    JsonValue result = JsonValue::object();
-    return result;
+nlohmann::json DapServer::handleStepIn(const nlohmann::json& args) {
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handleStepOut(const JsonValue& args) {
-    stepExecution(StepType::Out);
-
-    JsonValue result = JsonValue::object();
-    return result;
+nlohmann::json DapServer::handleStepOut(const nlohmann::json& args) {
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handlePause(const JsonValue& args) {
-    pauseExecution();
-    return JsonValue::object();
+nlohmann::json DapServer::handlePause(const nlohmann::json& args) {
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handleDisconnect(const JsonValue& args) {
-    interpreter_->stop();
-    return JsonValue::object();
+nlohmann::json DapServer::handleDisconnect(const nlohmann::json& args) {
+    return nlohmann::json::object();
 }
 
-JsonValue DapServer::handleEvaluate(const JsonValue& args) {
-    std::string expression = args["expression"].asString();
-
-    Value value = interpreter_->evaluate(expression);
-
-    JsonValue result = JsonValue::object();
-    result.set("result", value.toString());
-    result.set("type", value.typeName());
-    result.set("variablesReference", 0);
+nlohmann::json DapServer::handleEvaluate(const nlohmann::json& args) {
+    nlohmann::json result = nlohmann::json::object();
+    result["result"] = "Debugging not available";
+    result["type"] = "string";
+    result["variablesReference"] = 0;
     return result;
 }
 
 void DapServer::startExecution() {
-    state_ = DebugState::Running;
-
-    interpreter_->run();
-
-    // Check result
-    if (interpreter_->state() == ExecutionState::Error) {
-        sendOutputEvent("stderr", "Error: " + interpreter_->errorMessage() + "\n");
-    }
-
-    sendTerminatedEvent();
+    // Not implemented
 }
 
 void DapServer::pauseExecution() {
-    interpreter_->pause();
-    state_ = DebugState::Paused;
-    sendStoppedEvent("pause", "Paused");
+    // Not implemented
 }
 
 void DapServer::continueExecution() {
-    state_ = DebugState::Running;
-    interpreter_->resume();
+    // Not implemented
 }
 
 void DapServer::stepExecution(StepType type) {
-    state_ = DebugState::Stepping;
-    stepType_ = type;
-
-    StepMode mode = StepMode::None;
-    switch (type) {
-        case StepType::In:
-            mode = StepMode::In;
-            break;
-        case StepType::Over:
-            mode = StepMode::Over;
-            break;
-        case StepType::Out:
-            mode = StepMode::Out;
-            break;
-        default:
-            break;
-    }
-
-    interpreter_->step(mode);
+    // Not implemented
 }
 
 bool DapServer::shouldBreak(const SourceLocation& location) {
-    // Check breakpoints
-    auto it = breakpoints_.find(location.filename);
-    if (it != breakpoints_.end()) {
-        for (const auto& bp : it->second) {
-            if (bp.line == (int)location.line) {
-                state_ = DebugState::Paused;
-                sendStoppedEvent("breakpoint", "Breakpoint hit");
-                return true;
-            }
-        }
-    }
-
-    // Check if stepping should stop
-    if (state_ == DebugState::Stepping) {
-        state_ = DebugState::Paused;
-        sendStoppedEvent("step", "Step completed");
-        return true;
-    }
-
     return false;
 }
 

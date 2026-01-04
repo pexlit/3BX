@@ -1,4 +1,5 @@
 import main.3bx
 
 effect second:
-	first
+	execute:
+		first

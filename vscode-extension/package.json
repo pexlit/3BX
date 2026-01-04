@@ -40,7 +40,7 @@
         "extensions": [
           ".3bx"
         ],
-        "configuration": "./language-configuration.json",
+        "configuration": "./language_configuration.json",
         "icon": {
           "light": "./icons/3bx-light.png",
           "dark": "./icons/3bx-dark.png"
@@ -51,7 +51,7 @@
       {
         "language": "3bx",
         "scopeName": "source.3bx",
-        "path": "./syntaxes/3bx.tmLanguage.json"
+        "path": "./syntaxes/3bx_tm_language.json"
       }
     ],
     "snippets": [
@@ -64,12 +64,12 @@
       {
         "label": "3BX Dark",
         "uiTheme": "vs-dark",
-        "path": "./themes/3bx-dark.json"
+        "path": "./themes/3bx_dark.json"
       },
       {
         "label": "3BX Colorful",
         "uiTheme": "vs-dark",
-        "path": "./themes/3bx-colorful.json"
+        "path": "./themes/3bx_colorful.json"
       }
     ],
     "configuration": {

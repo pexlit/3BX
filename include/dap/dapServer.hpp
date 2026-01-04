@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ast/ast.hpp"
 #include "lsp/lspServer.hpp"
+#include "lexer/token.hpp"  // For SourceLocation
+#include <nlohmann/json.hpp>
 
 #include <atomic>
 #include <condition_variable>
@@ -15,10 +16,6 @@
 #include <vector>
 
 namespace tbx {
-
-// Forward declarations
-class Interpreter;
-class PatternRegistry;
 
 // Breakpoint information
 struct Breakpoint {
@@ -92,11 +89,8 @@ private:
     bool launched_{};
     int sequenceNumber_{1};
 
-    // Interpreter for executing 3BX code
-    std::unique_ptr<Interpreter> interpreter_;
-
-    // Pattern registry (owned by DapServer for lifetime management)
-    std::unique_ptr<PatternRegistry> patternRegistry_;
+    // TODO: The interpreter has been removed from the old pipeline
+    // Debugging will be re-implemented with the new compiler pipeline
 
     // Breakpoint management
     int nextBreakpointId_{1};
@@ -122,24 +116,24 @@ private:
     std::string sourceContent_;
 
     // Message handling
-    JsonValue handleRequest(const std::string& command, const JsonValue& args, int seq);
+    nlohmann::json handleRequest(const std::string& command, const nlohmann::json& args, int seq);
 
     // DAP request handlers
-    JsonValue handleInitialize(const JsonValue& args);
-    JsonValue handleLaunch(const JsonValue& args);
-    JsonValue handleSetBreakpoints(const JsonValue& args);
-    JsonValue handleConfigurationDone(const JsonValue& args);
-    JsonValue handleThreads(const JsonValue& args);
-    JsonValue handleStackTrace(const JsonValue& args);
-    JsonValue handleScopes(const JsonValue& args);
-    JsonValue handleVariables(const JsonValue& args);
-    JsonValue handleContinue(const JsonValue& args);
-    JsonValue handleNext(const JsonValue& args);
-    JsonValue handleStepIn(const JsonValue& args);
-    JsonValue handleStepOut(const JsonValue& args);
-    JsonValue handlePause(const JsonValue& args);
-    JsonValue handleDisconnect(const JsonValue& args);
-    JsonValue handleEvaluate(const JsonValue& args);
+    nlohmann::json handleInitialize(const nlohmann::json& args);
+    nlohmann::json handleLaunch(const nlohmann::json& args);
+    nlohmann::json handleSetBreakpoints(const nlohmann::json& args);
+    nlohmann::json handleConfigurationDone(const nlohmann::json& args);
+    nlohmann::json handleThreads(const nlohmann::json& args);
+    nlohmann::json handleStackTrace(const nlohmann::json& args);
+    nlohmann::json handleScopes(const nlohmann::json& args);
+    nlohmann::json handleVariables(const nlohmann::json& args);
+    nlohmann::json handleContinue(const nlohmann::json& args);
+    nlohmann::json handleNext(const nlohmann::json& args);
+    nlohmann::json handleStepIn(const nlohmann::json& args);
+    nlohmann::json handleStepOut(const nlohmann::json& args);
+    nlohmann::json handlePause(const nlohmann::json& args);
+    nlohmann::json handleDisconnect(const nlohmann::json& args);
+    nlohmann::json handleEvaluate(const nlohmann::json& args);
 
     // Execution control
     void startExecution();
@@ -151,7 +145,7 @@ private:
     bool shouldBreak(const SourceLocation& location);
 
     // Event sending
-    void sendEvent(const std::string& event, const JsonValue& body = JsonValue());
+    void sendEvent(const std::string& event, const nlohmann::json& body = nlohmann::json());
     void sendStoppedEvent(const std::string& reason, const std::string& description = "");
     void sendTerminatedEvent();
     void sendOutputEvent(const std::string& category, const std::string& output);
@@ -160,7 +154,7 @@ private:
     std::string readMessage();
     void writeMessage(const std::string& content);
     void sendResponse(int requestSeq, bool success, const std::string& command,
-                      const JsonValue& body = JsonValue(), const std::string& message = "");
+                      const nlohmann::json& body = nlohmann::json(), const std::string& message = "");
 
     // Logging
     void log(const std::string& message);

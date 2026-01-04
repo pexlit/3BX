@@ -167,7 +167,7 @@ Token Lexer::makeToken(TokenType type, const std::string& lexeme) {
 }
 
 Token Lexer::scanString() {
-    std::string value;
+    std::string stringValue;
     while (!atEnd() && current() != '"') {
         if (current() == '\n') {
             line_++;
@@ -176,14 +176,14 @@ Token Lexer::scanString() {
         if (current() == '\\' && pos_ + 1 < source_.size()) {
             advance();
             switch (current()) {
-                case 'n': value += '\n'; break;
-                case 't': value += '\t'; break;
-                case '"': value += '"'; break;
-                case '\\': value += '\\'; break;
-                default: value += current();
+                case 'n': stringValue += '\n'; break;
+                case 't': stringValue += '\t'; break;
+                case '"': stringValue += '"'; break;
+                case '\\': stringValue += '\\'; break;
+                default: stringValue += current();
             }
         } else {
-            value += current();
+            stringValue += current();
         }
         advance();
     }
@@ -194,8 +194,8 @@ Token Lexer::scanString() {
 
     advance(); // closing "
 
-    Token token = makeToken(TokenType::STRING, "\"" + value + "\"");
-    token.value = value;
+    Token token = makeToken(TokenType::STRING, "\"" + stringValue + "\"");
+    token.value = stringValue;
     return token;
 }
 

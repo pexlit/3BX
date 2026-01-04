@@ -24,32 +24,6 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 # Source files by component
 set(LEXER_SOURCES
     src/lexer/lexer.cpp
-    src/lexer/token.cpp
-)
-
-set(PARSER_SOURCES
-    src/parser/parser.cpp
-)
-
-set(AST_SOURCES
-    src/ast/ast.cpp
-)
-
-set(SEMANTIC_SOURCES
-    src/semantic/semantic.cpp
-)
-
-set(CODEGEN_SOURCES
-    src/codegen/codegen.cpp
-)
-
-set(PATTERN_SOURCES
-    src/pattern/pattern.cpp
-    src/pattern/pattern_registry.cpp
-    src/pattern/pattern_matcher.cpp
-    src/pattern/patternTree.cpp
-    src/pattern/precedence.cpp
-    src/pattern/pattern_resolution.cpp
 )
 
 set(LSP_SOURCES
@@ -60,22 +34,23 @@ set(DAP_SOURCES
     src/dap/dapServer.cpp
 )
 
-set(INTERPRETER_SOURCES
-    src/interpreter/interpreter.cpp
+set(COMPILER_SOURCES
+    src/compiler/importResolver.cpp
+    src/compiler/sectionAnalyzer.cpp
+    src/compiler/patternResolver.cpp
+    src/compiler/patternTree.cpp
+    src/compiler/typeInference.cpp
+    src/compiler/codeGenerator.cpp
+    src/compiler/optimizer.cpp
 )
 
 # Main executable
 add_executable(3bx
     src/main.cpp
     ${LEXER_SOURCES}
-    ${PARSER_SOURCES}
-    ${AST_SOURCES}
-    ${SEMANTIC_SOURCES}
-    ${CODEGEN_SOURCES}
-    ${PATTERN_SOURCES}
     ${LSP_SOURCES}
     ${DAP_SOURCES}
-    ${INTERPRETER_SOURCES}
+    ${COMPILER_SOURCES}
 )
 
 # Link LLVM libraries

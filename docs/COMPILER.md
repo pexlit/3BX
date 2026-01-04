@@ -101,7 +101,9 @@ Section (root):
 
 ## Step 3: Pattern Resolution
 
-Resolve patterns and variables iteratively. Each section and line has a boolean indicating if their pattern is resolved.
+Resolve patterns and variables iteratively using a pattern tree. Each section and line has a boolean indicating if their pattern is resolved.
+
+> **See [PATTERN_MATCHING.md](PATTERN_MATCHING.md)** for detailed documentation on the pattern tree structure, expression substitution, and alternative handling.
 
 ### Algorithm
 
@@ -322,3 +324,15 @@ The compiler produces one of:
 | 4. Type Inference | Resolved patterns | Typed patterns and expressions |
 | 5. Code Generation | Typed patterns | LLVM IR |
 | 6. Optimization | LLVM IR | Optimized native code |
+
+---
+
+## Pattern Tree Design
+
+> **Full documentation: [PATTERN_MATCHING.md](PATTERN_MATCHING.md)**
+
+Pattern matching uses a trie-like tree structure with:
+- **Merged literals**: Consecutive literal tokens merged into single strings for O(1) lookup
+- **Expression slots**: `$` nodes that recursively match sub-expressions
+- **Branch-and-merge**: Alternatives `[a|b]` branch within a pattern and merge back, avoiding exponential expansion
+- **Lazy captures**: `{word}` captures unevaluated expressions for deferred evaluation

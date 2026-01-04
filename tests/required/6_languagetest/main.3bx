@@ -1,0 +1,12 @@
+effect zeg bericht:
+	execute:
+		@intrinsic("print", bericht)
+
+effect maak variabele waarde:
+	execute:
+		@intrinsic("store", variabele, waarde)
+
+zeg "hallo"
+maak a 10
+zeg "a is:"
+zeg a

@@ -461,6 +461,7 @@ async function startLanguageClient(context: vscode.ExtensionContext): Promise<vo
             log(`    - completionProvider: ${!!caps.completionProvider}`);
             log(`    - referencesProvider: ${!!caps.referencesProvider}`);
             log(`    - documentSymbolProvider: ${!!caps.documentSymbolProvider}`);
+            log(`    - semanticTokensProvider: ${!!caps.semanticTokensProvider}`);
         }
     } catch (error) {
         // Handle case where compiler doesn't exist or doesn't support --lsp

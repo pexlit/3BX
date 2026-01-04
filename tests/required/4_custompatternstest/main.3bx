@@ -1,5 +1,3 @@
-import print.3bx
-
 expression customadder:
 	get:
 		print "custom adder:"
