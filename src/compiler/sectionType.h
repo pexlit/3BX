@@ -1,3 +1,4 @@
+#include <string>
 enum class SectionType
 {
 	Custom,
@@ -6,3 +7,6 @@ enum class SectionType
 	Effect,
 	Class
 };
+
+SectionType sectionTypeFromString(const std::string& str);
+std::string sectionTypeToString(SectionType type);

@@ -1,5 +1,6 @@
 #include <string>
 struct SourceFile;
+struct Section;
 struct CodeLine
 {
 	CodeLine(std::string text, SourceFile* sourceFile):fullText(fullText), sourceFile(sourceFile) {}
@@ -7,6 +8,8 @@ struct CodeLine
 	//full text including line terminators
 	std::string fullText;
 	//the text without comments and right-trimmed
-	std::string rightTrimmedText;
-
+	std::string rightTrimmedText{};
+	//the pattern part of the line. excludes system patterns.
+	std::string patternText{};
+	Section* section{};
 };
