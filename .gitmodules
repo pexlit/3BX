@@ -1,0 +1,3 @@
+[submodule "src/pexlit"]
+	path = src/pexlit
+	url = git@github.com:pexlit/pexwrap.git
