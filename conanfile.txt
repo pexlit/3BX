@@ -1,0 +1,8 @@
+[requires]
+#fastnoise2/0.10.0-alpha
+
+
+[generators]
+CMakeDeps
+CMakeToolchain
+

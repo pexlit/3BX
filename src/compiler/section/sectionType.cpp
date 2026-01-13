@@ -1,6 +1,6 @@
 #include "sectionType.h"
 
-SectionType sectionTypeFromString(const std::string &str)
+SectionType sectionTypeFromString(std::string_view str)
 {
 	if (str == "section")
 		return SectionType::Section;

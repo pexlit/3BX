@@ -6,13 +6,14 @@
 // to execute that executable: ./main
 // the compiler will always receive one source file, since that file imports all other files
 // if no arguments are given, the program will print its arguments to the console
-int main(char *argumentValues[], int argumentCount)
+int main(int argumentCount, char *argumentValues[])
 {
 	if (argumentCount)
 	{
 		ParseContext context;
-		// first, read all source files
-		importSourceFile(argumentValues[0], context);
+		compile(argumentValues[1], context);
+		context.reportDiagnostics();
+		
 	}
 	else
 	{

@@ -4,9 +4,21 @@
 #include "stringFunctions.h"
 #include "sourceFile.h"
 #include "IndentData.h"
+#include <list>
+#include <ranges>
+#include "patternElement.h"
+#include "patternTreeNode.h"
 
-// non-capturing regex for line terminators
-const std::regex lineTerminatorRegex("/(?<=\r\n|\r(?!\n)|\n)/g");
+// regex for line terminators - matches each line including its terminator
+const std::regex lineWithTerminatorRegex("([^\r\n]*(?:\r\n|\r|\n))|([^\r\n]+$)");
+
+bool compile(const std::string &path, ParseContext &context)
+{
+	// first, read all source files
+	return importSourceFile(path, context) &&
+		   analyzeSections(context) &&
+		   resolvePatterns(context);
+}
 
 bool importSourceFile(const std::string &path, ParseContext &context)
 {
@@ -17,28 +29,37 @@ bool importSourceFile(const std::string &path, ParseContext &context)
 		return false;
 	}
 
-	// split on any line ending and capture the ending too
-	std::vector<std::string> lines = splitString(text, lineTerminatorRegex);
-
+	// iterate over lines, each match includes the line terminator
 	SourceFile *sourceFile = new SourceFile(path, text);
 
-	for (const std::string &lineString : lines)
+	std::string_view fileView{sourceFile->content};
+
+	std::cregex_iterator iter(fileView.begin(), fileView.end(), lineWithTerminatorRegex);
+	std::cregex_iterator end;
+	int sourceFileLineIndex = 0;
+	for (; iter != end; ++iter, ++sourceFileLineIndex)
 	{
-		CodeLine line = CodeLine(lineString, sourceFile);
+		std::string_view lineString = fileView.substr(iter->position(), iter->length());
+		CodeLine *line = new CodeLine(lineString, sourceFile);
+		line->sourceFileLineIndex = sourceFileLineIndex;
 		// first, remove comments and trim whitespace from the right
 
-		line.rightTrimmedText = std::regex_replace(lineString, std::regex("#.*$"), "");
+		std::cmatch match;
+		std::regex_search(lineString.begin(), lineString.end(), match, std::regex("[\\s]*(?:#[\\S\\s]*)?$"));
+		line->rightTrimmedText = lineString.substr(0, match.position());
 
 		// check if the line is an import statement
-		if (line.rightTrimmedText.starts_with("import "))
+		if (line->rightTrimmedText.starts_with("import "))
 		{
 			// if so, recursively import the file
 			// extract the file path
-			std::string importPath = line.rightTrimmedText.substr(std::string_view("import ").length());
-			if (!importSourceFile(importPath, context))
+			std::string_view importPath = line->rightTrimmedText.substr(std::string_view("import ").length());
+			if (!importSourceFile((std::string)importPath, context))
 			{
 				return false;
 			}
+			// this line doesn't need any form of pattern matching
+			line->resolved = true;
 		}
 		context.codeLines.push_back(line);
 	}
@@ -49,68 +70,158 @@ bool importSourceFile(const std::string &path, ParseContext &context)
 bool analyzeSections(ParseContext &context)
 {
 	IndentData data{};
-	Section currentSection;
+	Section *currentSection = context.mainSection = new Section(SectionType::Custom);
+	int compiledLineIndex = 0;
 	// code lines are added in import order, meaning lines get replaced with code from imported files. we assume that the indent level of the code of imported files and the import statements both match.
-	for (CodeLine &line : context.codeLines)
+	for (CodeLine *line : context.codeLines)
 	{
-		// check if this line starts a section
-		if (line.rightTrimmedText.ends_with(":"))
-		{
-			// determine the section type
-			std::size_t spaceIndex = line.rightTrimmedText.find(' ');
-			SectionType sectionType = SectionType::Custom;
-			if (spaceIndex != std::string::npos)
-			{
-				std::string sectionTypeString = line.rightTrimmedText.substr(0, spaceIndex);
-				sectionType = sectionTypeFromString(sectionTypeString);
-			}
-			line.section = new Section(sectionType);
-		}
+		int oldIndentLevel = data.indentLevel;
 		// check indent level
-		std::string indentString = std::regex_match(line.fullText, std::regex("^(\\s*)"))[1];
+		std::cmatch match;
+		std::regex_search(line->rightTrimmedText.begin(), line->rightTrimmedText.end(), match, std::regex("^(\\s*)"));
+		std::string indentString = match[0];
 		if (data.indentString.empty())
 		{
 			data.indentString = indentString;
 			data.indentLevel = !indentString.empty();
 		}
-		else
+		else if (indentString.length() % data.indentString.length() != 0)
 		{
-			// check if the indentation is valid
-
-			// check type of indent. indentation is only important for section exits, since colons determine section starts.
-			if (indentString.length())
+			// check amount of indents
+			context.diagnostics.push_back(Diagnostic(
+				Diagnostic::Level::Error,
+				"Invalid indentation! expected " + std::to_string(data.indentString.length() * data.indentLevel) + " " + charName(data.indentString[0]) + "s, but found " + std::to_string(indentString.length()),
+				Range(line, 0, indentString.length())));
+		}
+		// check type of indent. indentation is only important for section exits, since colons determine section starts.
+		if (indentString.length())
+		{
+			char expectedIndentChar = data.indentString[0];
+			size_t invalidCharIndex = indentString.find_first_not_of(expectedIndentChar);
+			if (invalidCharIndex != std::string::npos)
 			{
-				char expectedIndentChar = data.indentString[0];
-				size_t invalidCharIndex = indentString.find_first_not_of(expectedIndentChar);
-				if (invalidCharIndex != std::string::npos)
-				{
-					context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "Invalid indentation! expected only " + charName(expectedIndentChar) + "s, but found a " + charName(indentString[invalidCharIndex]), line.sourceFile));
-				}
-				// check amount of indents
-				else if (indentString.length() % data.indentString.length() != 0)
-				{
-					context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "Invalid indentation! expected " + std::to_string(data.indentString.length() * data.indentLevel) + " " + charName(data.indentString[0]) + "s, but found " + std::to_string(indentString.length())), line.sourceFile);
-				}
-				else
-				{
-					int newIndentLevel = indentString.length() / data.indentString.length();
-					
-					if(newIndentLevel > data.maxIndentLevel){
-						//cannot go up sections twice in a time
-						context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "Invalid indentation! expected at max " + std::to_string(data.indentString.length() * data.maxIndentLevel) + " " + charName(expectedIndentChar) + "s, but found" + std::to_string(indentString.length()), line.sourceFile));
-					}
-					data.indentLevel = newIndentLevel;
-				}
+				context.diagnostics.push_back(Diagnostic(
+					Diagnostic::Level::Error,
+					"Invalid indentation! expected only " + charName(expectedIndentChar) + "s, but found a " + charName(indentString[invalidCharIndex]),
+					Range(line, invalidCharIndex, indentString.length())));
 			}
 			else
 			{
-				data.indentString = "";
-				data.indentLevel = 0;
+				data.indentLevel = indentString.length() / data.indentString.length();
+			}
+		}
+		else
+		{
+			data.indentString = "";
+			data.indentLevel = 0;
+		}
+
+		if (data.indentLevel != oldIndentLevel)
+		{
+			// section change
+			if (data.indentLevel > oldIndentLevel)
+			{
+				// cannot go up sections twice in a time
+				context.diagnostics.push_back(Diagnostic(
+					Diagnostic::Level::Error,
+					"Invalid indentation! expected at max " + std::to_string(data.indentString.length() * oldIndentLevel) + " " + charName(data.indentString[0]) + "s, but found " + std::to_string(indentString.length()),
+					Range(line, 0, indentString.length())));
+
+				// fatal for compilation, since no sections will be made
+				return false;
+			}
+			else
+			{
+				// exit some sections
+				for (int popIndentLevel = oldIndentLevel; popIndentLevel != data.indentLevel; popIndentLevel--)
+				{
+					currentSection = currentSection->parent;
+					currentSection->endLineIndex = compiledLineIndex + 1;
+				}
 			}
 		}
 
-		previousLine = line;
+		line->section = currentSection;
+		currentSection->codeLines.push_back(line);
+
+		std::string_view trimmedText = line->rightTrimmedText.substr(indentString.length());
+
+		// check if this line starts a section
+		if (trimmedText.ends_with(":"))
+		{
+			line->patternText = trimmedText.substr(0, trimmedText.length() - 1);
+
+			// set the current section to the new section for the next line
+			currentSection = currentSection->createSection(context, line);
+			if (!currentSection)
+				return false;
+			currentSection->startLineIndex = compiledLineIndex + 1;
+			line->sectionOpening = currentSection;
+			data.indentLevel++;
+		}
+		else
+		{
+			line->patternText = trimmedText;
+			if (!line->patternText.length())
+				line->resolved = true;
+		}
+		++compiledLineIndex;
 	}
 
 	return true;
+}
+
+// step 3: loop over code, resolve patterns and build up a pattern tree until all patterns are resolved
+bool resolvePatterns(ParseContext &context)
+{
+	// add the roots
+	std::fill(std::begin(context.patternTrees), std::end(context.patternTrees), new PatternTreeNode(PatternElement::Type::Other, ""));
+
+	// solving all patterns and variables is like solving a sudoku. let's get the 'starting numbers' first: those are the patterns which only consist of one element.
+	std::remove_if(unResolvedPatternDefinitions.begin(), unResolvedPatternDefinitions.end(), [context](CodeLine *line)
+				   {
+					line->patternElements = getPatternElements(line->patternText);
+					if(line->isPatternDefinition() && line->patternElements.size() == 1)
+					{
+						//this single element can never be a variable, so we can declare this pattern definition as resolved.
+						line->sectionOpening->resolved = true;
+						line->resolved = true;
+						//add the pattern to its respective pattern tree
+						context.patternTrees[(int)line->sectionOpening->type]->addPatternPart(line->patternElements, line->sectionOpening);
+					}
+					return line->resolved; });
+
+	// now start iterating and resolving.
+	for (int resolutionIteration = 0; resolutionIteration < context.maxResolutionIterations; resolutionIteration++)
+	{
+		context.mainSection->updateResolution();
+
+		if (context.mainSection->resolved)
+		{
+			// all patterns are resolved
+			return true;
+		}
+		// each iteration, we go over all pattern references first
+		std::remove_if(unResolvedPatternReferences.begin(), unResolvedPatternReferences.end(), [context](CodeLine *line)
+					   {
+			auto enclosingPatternType = line->sectionOpening ? SectionType::Section : SectionType::Effect;
+			//search the pattern tree for this line's pattern
+			if(/*PatternTreeNode* node =*/ context.patternTrees[(int)enclosingPatternType]->match(line->patternElements)){
+				line->resolved = true;
+			}
+			return line->resolved; });
+		// then, go over sections and check if all pattern references are resolved.
+		context.mainSection->updateResolution();
+		if (context.mainSection->resolved)
+		{
+			// all patterns are resolved
+			return true;
+		}
+	}
+	// some patterns couldn't be resolved
+	for (CodeLine *line : unResolvedPatternReferences)
+	{
+		context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "This pattern couldn't be resolved", Range(line, line->patternText.begin() - line->fullText.begin(), line->patternText.end() - line->fullText.begin())));
+	}
+	return false;
 }

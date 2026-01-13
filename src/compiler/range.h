@@ -1,0 +1,13 @@
+#pragma once
+#include <string_view>
+struct CodeLine;
+struct Range
+{
+	CodeLine *line;
+	std::string_view subString;
+	Range(CodeLine *line, int start, int end);
+	Range(CodeLine *line, std::string_view subString);
+	std::string toString() const;
+	int start() const;
+	int end() const;
+};

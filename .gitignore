@@ -1,0 +1,5 @@
+# Build output
+build/
+
+# CMake user-specific presets
+CMakeUserPresets.json

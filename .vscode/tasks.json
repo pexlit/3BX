@@ -1,0 +1,11 @@
+{
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": [
+				"./scripts/build.sh"
+			]
+		},
+	]
+}

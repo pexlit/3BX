@@ -1,3 +1,15 @@
+effect set var to val:
+    execute:
+        @intrinsic("store", var, val)
+
+effect print msg:
+    execute:
+        @intrinsic("print", msg)
+
+expression left + right:
+    get:
+        return @intrinsic("add", left, right)
+
 # Simple test. prelude.3bx is imported automatically.
 set x to 42
 set y to 10
