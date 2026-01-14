@@ -10,4 +10,5 @@ struct Range
 	std::string toString() const;
 	int start() const;
 	int end() const;
+	Range subRange(int start, int end);
 };

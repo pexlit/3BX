@@ -144,8 +144,11 @@ bool analyzeSections(ParseContext &context) {
 			data.indentLevel++;
 		} else {
 			line->patternText = trimmedText;
-			if (!line->patternText.length())
+			if (line->patternText.length()) {
+				currentSection->processLine(context, line);
+			} else {
 				line->resolved = true;
+			}
 		}
 		++compiledLineIndex;
 	}
@@ -239,7 +242,7 @@ bool resolvePatterns(ParseContext &context) {
 		}
 		);
 		if (unResolvedSections.size() == 0 && unResolvedPatternReferences.size() == 0) {
-			//all patterns have been successfully resolved
+			// all patterns have been successfully resolved
 			return true;
 		}
 	}

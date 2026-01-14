@@ -35,8 +35,7 @@ std::vector<MatchProgress> MatchProgress::step() {
 
 			if (sourceElementIndex == patternReference->patternElements.size() && !parent) {
 				// found a full match
-				PatternMatch *fullMatch =
-					new PatternMatch{.matchedEndNode = currentNode, .range = patternReference->pattern.text};
+				result = new PatternMatch{.matchedEndNode = currentNode, .range = patternReference->pattern.text};
 			}
 			if (canBeSubstitute()) {
 				// this might be a submatch of a higher level match.

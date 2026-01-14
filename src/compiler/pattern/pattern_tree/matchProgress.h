@@ -28,8 +28,8 @@ struct MatchProgress {
 	// the nodes this progress passed already
 	std::vector<PatternTreeNode *> nodesPassed{};
 
-	int sourceElementIndex{};
-	int sourceCharIndex{};
+	size_t sourceElementIndex{};
+	size_t sourceCharIndex{};
 	// returns a vector containing alternative steps we could take through the pattern tree, ordered from least important ([0])
 	// to most important ([length() - 1])
 	std::vector<MatchProgress> step();

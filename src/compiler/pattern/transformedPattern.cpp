@@ -31,16 +31,16 @@ inline int TransformedPattern::getPatternPos(int linePos)
 							 { return frame.patternPos; });
 }
 
-void TransformedPattern::replace(int lineStartPos, int lineEndPos)
+void TransformedPattern::replace(int lineStartPos, int lineEndPos, std::string replacement)
 {
-	replaceLocal(getPatternPos(lineStartPos), getPatternPos(lineEndPos), lineEndPos);
+	replaceLocal(getPatternPos(lineStartPos), getPatternPos(lineEndPos), lineEndPos, replacement);
 }
 
-void TransformedPattern::replaceLocal(int patternStartPos, int patternEndPos, int lineEndPos)
+void TransformedPattern::replaceLocal(int patternStartPos, int patternEndPos, int lineEndPos, std::string replacement)
 {
 	text = text.substr(patternStartPos, 0) + argumentChar + text.substr(patternEndPos);
 	// insert a new keyframe after the argument char and check for any keyframes which got redundant
-	int shift = (patternEndPos - patternStartPos) + std::string_view("\a").length();
+	int shift = (patternEndPos - patternStartPos) + replacement.length();
 	if (shift)
 	{
 		bool added{};

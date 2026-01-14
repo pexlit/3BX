@@ -16,7 +16,7 @@ struct Diagnostic
 	Level level;
 	std::string message;
 	Range range;
-	Diagnostic(Level level, std::string_view message, Range range)
+	Diagnostic(Level level, std::string message, Range range)
 		: level(level), message(message), range(range) {}
 	std::string toString() const;
 };

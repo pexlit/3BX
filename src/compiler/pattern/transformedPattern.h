@@ -29,6 +29,6 @@ struct TransformedPattern
 	inline int getLinePos(int patternPos);
 	inline int getPatternPos(int linePos);
 	//replace this part of the pattern with a type element.
-	void replace(int lineStartPos, int lineEndPos);
-	void replaceLocal(int patternStartPos, int patternEndPos, int lineEndPos);
+	void replace(int lineStartPos, int lineEndPos, std::string replacement = std::string() + argumentChar);
+	void replaceLocal(int patternStartPos, int patternEndPos, int lineEndPos, std::string replacement = std::string() + argumentChar);
 };

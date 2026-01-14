@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 #include "patternReference.h"
+#include "stringHierarchy.h"
 struct ParseContext;
 struct Variable;
 struct Section
@@ -29,5 +30,6 @@ struct Section
 	void collectPatternReferencesAndSections(std::list<PatternReference *> &patternReferences, std::list<Section *> &sections);
 	virtual bool processLine(ParseContext &context, CodeLine *line);
 	virtual Section *createSection(ParseContext &context, CodeLine *line);
-	bool detectPatterns(ParseContext &context, Range range);
+	bool detectPatterns(ParseContext &context, Range range, SectionType patternType);
+	bool detectPatternsRecursively(ParseContext& context, Range range, StringHierarchy* node, SectionType patternType);
 };
