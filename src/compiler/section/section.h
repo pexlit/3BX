@@ -32,4 +32,5 @@ struct Section
 	virtual Section *createSection(ParseContext &context, CodeLine *line);
 	bool detectPatterns(ParseContext &context, Range range, SectionType patternType);
 	bool detectPatternsRecursively(ParseContext& context, Range range, StringHierarchy* node, SectionType patternType);
+	void updateResolution(ParseContext &context);
 };

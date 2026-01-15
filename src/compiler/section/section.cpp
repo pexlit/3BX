@@ -282,3 +282,57 @@ bool Section::detectPatternsRecursively(ParseContext &context, Range range, Stri
 
 	return true;
 }
+
+void Section::updateResolution(ParseContext &context) {
+	// wether all pattern definitions are resolved for this section
+	bool allPatternDefinitionsResolved = patternDefinitions.size();
+	for (auto definition : patternDefinitions) {
+		if (!definition->resolved) {
+			// loop over all pattern elements and 'stripe off' parts with
+			// variables
+			for (auto element : definition->patternElements) {
+				definition->resolved = true;
+				if (element.type == PatternElement::Type::VariableLike) {
+					if (variables.count(element.text)) {
+						element.type = PatternElement::Type::Variable;
+					}
+					// a single pattern element can never become a variable
+					else if (definition->patternElements.size() > 1) {
+						// this element could possibly become a variable
+						// later. we'll have to check again in the next
+						// iteration
+						definition->resolved = false;
+						allPatternDefinitionsResolved = false;
+					}
+				}
+			}
+			if (definition->resolved) {
+				// we can add this definition already, to help resolve more references
+				context.patternTrees[(size_t)type]->addPatternPart(definition->patternElements, this);
+			}
+		}
+	}
+	// otherwise, we resolved the section before all of the pattern
+	// references inside were resolved!
+	if (!allPatternDefinitionsResolved) {
+		allPatternDefinitionsResolved = true;
+		// the normal way of resolution is by checking if all of it's
+		// lines are resolved and then marking the section as resolved.
+		for (PatternReference *reference : patternReferences) {
+			if (!reference->resolved) {
+				allPatternDefinitionsResolved = false;
+			}
+		}
+	}
+	if (allPatternDefinitionsResolved) {
+		for (auto definition : patternDefinitions) {
+			// add all unresolved definitions to the pattern tree
+			if (!definition->resolved) {
+				definition->resolved = true;
+
+				context.patternTrees[(size_t)type]->addPatternPart(definition->patternElements, this);
+			}
+		}
+	}
+	resolved = allPatternDefinitionsResolved;
+}
