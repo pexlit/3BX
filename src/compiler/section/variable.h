@@ -1,11 +1,10 @@
 #pragma once
 #include "range.h"
-#include <vector>
 #include <string>
-struct Variable
-{
+#include <vector>
+struct Variable {
+	Variable(std::string name) : name(name) {}
 	std::string name;
-	//all locations which reference this variable
+	// all locations which reference this variable
 	std::vector<Range> references;
-	
 };

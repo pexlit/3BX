@@ -14,5 +14,5 @@ expression left + right:
 set x to 42
 set y to 10
 #this matches 'set $ to $' and the second '$' matches '$ + $'
-set z to x + y
+set z to x  + y
 print z

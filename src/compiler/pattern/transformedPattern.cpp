@@ -1,14 +1,15 @@
 #include "patternReference.h"
+#include "transformedPattern.h"
 
 TransformedPattern::TransformedPattern(std::string pattern) : text(pattern)
 {
 }
 
-inline int TransformedPattern::transformPosition(int position, keyFrameTransformer keyFrameToInpos, keyFrameTransformer keyFrameToOutPos)
+size_t TransformedPattern::transformPosition(size_t position, keyFrameTransformer keyFrameToInpos, keyFrameTransformer keyFrameToOutPos)
 {
 	for (KeyFrame frame : keyframes | std::views::reverse)
 	{
-		int inPos = keyFrameToInpos(frame);
+		size_t inPos = keyFrameToInpos(frame);
 		if (inPos < position)
 		{
 			return keyFrameToOutPos(frame) + position - inPos;
@@ -17,28 +18,32 @@ inline int TransformedPattern::transformPosition(int position, keyFrameTransform
 	return position;
 }
 
-inline int TransformedPattern::getLinePos(int patternPos)
+size_t TransformedPattern::getLinePos(size_t patternPos)
 {
 	return transformPosition(patternPos, [](const KeyFrame &frame)
 							 { return frame.patternPos; }, [](const KeyFrame &frame)
 							 { return frame.linePos; });
 }
 
-inline int TransformedPattern::getPatternPos(int linePos)
+size_t TransformedPattern::getPatternPos(size_t linePos)
 {
 	return transformPosition(linePos, [](const KeyFrame &frame)
 							 { return frame.linePos; }, [](const KeyFrame &frame)
 							 { return frame.patternPos; });
 }
 
-void TransformedPattern::replace(int lineStartPos, int lineEndPos, std::string replacement)
+void TransformedPattern::replaceLine(size_t lineStartPos, size_t lineEndPos, std::string replacement)
 {
 	replaceLocal(getPatternPos(lineStartPos), getPatternPos(lineEndPos), lineEndPos, replacement);
 }
 
-void TransformedPattern::replaceLocal(int patternStartPos, int patternEndPos, int lineEndPos, std::string replacement)
-{
-	text = text.substr(patternStartPos, 0) + argumentChar + text.substr(patternEndPos);
+void TransformedPattern::replacePattern(size_t patternStartPos, size_t patternEndPos,std::string replacement) {
+	replaceLocal(patternStartPos, patternEndPos, getLinePos(patternEndPos), replacement);
+}
+void TransformedPattern::replaceLocal(
+	size_t patternStartPos, size_t patternEndPos, size_t lineEndPos, std::string replacement
+) {
+	text = text.substr(0, patternStartPos) + replacement + text.substr(patternEndPos);
 	// insert a new keyframe after the argument char and check for any keyframes which got redundant
 	int shift = (patternEndPos - patternStartPos) + replacement.length();
 	if (shift)

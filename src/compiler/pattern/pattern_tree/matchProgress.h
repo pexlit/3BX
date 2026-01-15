@@ -15,8 +15,6 @@ struct MatchProgress {
 	// we don't need child nodes, since the youngest node is always the matching once.
 	MatchProgress *parent{};
 	ParseContext *context{};
-	// the pattern type we're currently matching for
-	SectionType type{};
 	// the root node of the current node
 	PatternTreeNode *rootNode{};
 	// the node this step is at, currently.
@@ -27,6 +25,9 @@ struct MatchProgress {
 
 	// the nodes this progress passed already
 	std::vector<PatternTreeNode *> nodesPassed{};
+	
+	// the pattern type we're currently matching for
+	SectionType type{};
 
 	size_t sourceElementIndex{};
 	size_t sourceCharIndex{};

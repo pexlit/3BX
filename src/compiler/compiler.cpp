@@ -5,6 +5,7 @@
 #include "patternTreeNode.h"
 #include "sourceFile.h"
 #include "stringFunctions.h"
+#include "variable.h"
 #include <list>
 #include <ranges>
 #include <regex>
@@ -162,6 +163,15 @@ bool resolvePatterns(ParseContext &context) {
 	std::list<PatternReference *> unResolvedPatternReferences;
 	std::list<Section *> unResolvedSections;
 	context.mainSection->collectPatternReferencesAndSections(unResolvedPatternReferences, unResolvedSections);
+	for (Section *unResolvedSection : unResolvedSections) {
+		for (PatternDefinition *unresolvedDefinition : unResolvedSection->patternDefinitions) {
+			unresolvedDefinition->patternElements = getPatternElements(unresolvedDefinition->range.subString);
+		}
+	}
+	for (PatternReference *unResolvedPatternReference : unResolvedPatternReferences) {
+
+		unResolvedPatternReference->patternElements = getPatternElements(unResolvedPatternReference->pattern.text);
+	}
 	// add the roots
 	std::fill(
 		std::begin(context.patternTrees), std::end(context.patternTrees), new PatternTreeNode(PatternElement::Type::Other, "")
@@ -191,24 +201,32 @@ bool resolvePatterns(ParseContext &context) {
 	for (int resolutionIteration = 0; resolutionIteration < context.maxResolutionIterations; resolutionIteration++) {
 
 		// each iteration, we go over all sections first
-		std::remove_if(unResolvedSections.begin(), unResolvedSections.end(), [&context](Section *section) {
+		std::erase_if(unResolvedSections, [&context](Section *section) {
 			// wether all pattern definitions are resolved for this section
 			bool allPatternDefinitionsResolved = section->patternDefinitions.size();
 			for (auto definition : section->patternDefinitions) {
-				// loop over all pattern elements and 'stripe off' parts with
-				// variables
-				for (auto element : definition->patternElements) {
-					if (element.type == PatternElement::Type::VariableLike) {
-						if (section->variables.count(element.text)) {
-							element.type = PatternElement::Type::Variable;
+				if (!definition->resolved) {
+					// loop over all pattern elements and 'stripe off' parts with
+					// variables
+					for (auto element : definition->patternElements) {
+						definition->resolved = true;
+						if (element.type == PatternElement::Type::VariableLike) {
+							if (section->variables.count(element.text)) {
+								element.type = PatternElement::Type::Variable;
+							}
+							// a single pattern element can never become a variable
+							else if (definition->patternElements.size() > 1) {
+								// this element could possibly become a variable
+								// later. we'll have to check again in the next
+								// iteration
+								definition->resolved = false;
+								allPatternDefinitionsResolved = false;
+							}
 						}
-						// a single pattern element can never become a variable
-						else if (definition->patternElements.size() > 1) {
-							// this element could possibly become a variable
-							// later. we'll have to check again in the next
-							// iteration
-							allPatternDefinitionsResolved = false;
-						}
+					}
+					if (definition->resolved) {
+						// we can add this definition already, to help resolve more references
+						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, section);
 					}
 				}
 			}
@@ -224,23 +242,48 @@ bool resolvePatterns(ParseContext &context) {
 					}
 				}
 			}
+			if (allPatternDefinitionsResolved) {
+				for (auto definition : section->patternDefinitions) {
+					// add all unresolved definitions to the pattern tree
+					if (!definition->resolved) {
+						definition->resolved = true;
+
+						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, section);
+					}
+				}
+			}
 			section->resolved = allPatternDefinitionsResolved;
 			return section->resolved;
 		});
 
 		// then, go over all lines referencing patterns
-		std::remove_if(
-			unResolvedPatternReferences.begin(), unResolvedPatternReferences.end(), [&context](PatternReference *reference) {
+		std::erase_if(unResolvedPatternReferences, [&context](PatternReference *reference) {
 			// search the pattern tree for this line's pattern
 
 			PatternMatch *match = context.match(reference);
 			if (match) {
 				reference->resolved = true;
+			} else if (reference->patternElements.size() == 1 &&
+					   reference->patternElements[0].type == PatternElement::Type::VariableLike) {
+				// since there's no pattern definition matching this, this has to be a variable.
+				reference->resolved = true;
+				Section *variableContainer = reference->range.line->section;
+				while (variableContainer->type == SectionType::Custom) {
+					variableContainer = variableContainer->parent;
+				}
+				std::string name = reference->patternElements[0].text;
+				Variable *variable;
+				if (variableContainer->variables.count(name)) {
+					variable = variableContainer->variables[name];
+				} else {
+					variable = new Variable(name);
+				}
+				variableContainer->variables[name] = variable;
+				variable->references.push_back(reference->range);
 			}
 
 			return reference->resolved;
-		}
-		);
+		});
 		if (unResolvedSections.size() == 0 && unResolvedPatternReferences.size() == 0) {
 			// all patterns have been successfully resolved
 			return true;

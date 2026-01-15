@@ -12,7 +12,8 @@ struct PatternElement
 		// examples: 'the', 'or'
 		VariableLike,
 		// a variable
-		Variable
+		Variable,
+		Count
 	};
 	Type type;
 	// for example: 'the'

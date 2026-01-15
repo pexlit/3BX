@@ -202,13 +202,13 @@ bool Section::detectPatternsRecursively(ParseContext &context, Range range, Stri
 			constexpr std::string_view intrinsicPrefix = "@intrinsic("sv;
 			if (child->start >= intrinsicPrefix.length() &&
 				range.subString.substr(child->start - intrinsicPrefix.length(), intrinsicPrefix.length()) == intrinsicPrefix) {
-				reference->pattern.replace(child->start - intrinsicPrefix.length(), child->end + ")"sv.length());
+				reference->pattern.replaceLine(child->start - intrinsicPrefix.length(), child->end + ")"sv.length());
 				// this is an intrinsic call
 			} else {
-				reference->pattern.replace(child->start - "("sv.length(), child->end + ")"sv.length());
+				reference->pattern.replaceLine(child->start - "("sv.length(), child->end + ")"sv.length());
 			}
 		} else if (child->charachter == '"') {
-			reference->pattern.replace(child->start - "\""sv.length(), child->end + "\""sv.length());
+			reference->pattern.replaceLine(child->start - "\""sv.length(), child->end + "\""sv.length());
 		}
 		// when it's a string, we don't have to do anything for now
 	}
@@ -220,24 +220,58 @@ bool Section::detectPatternsRecursively(ParseContext &context, Range range, Stri
 	std::cregex_iterator iter(range.subString.begin(), range.subString.end(), numberRegex);
 	std::cregex_iterator end;
 	for (; iter != end; ++iter) {
-		reference->pattern.replace(iter->position(), iter->position() + iter->length());
+		reference->pattern.replaceLine(iter->position(), iter->position() + iter->length());
 	}
+
+	auto addWhiteSpaceWarning = [&context, &range, &reference](size_t start, size_t end) {
+		context.diagnostics.push_back(Diagnostic(
+			Diagnostic::Level::Warning, "all whitespace in patterns should be a single space",
+			range.subRange(reference->pattern.getLinePos(start), reference->pattern.getLinePos(end))
+		));
+	};
+
+	std::smatch matches;
+
+	// also, trim the pattern. we can't just use trim(), as that prevents diagnostics and does not update keyframes.
+
+	// left
+	std::regex_search(reference->pattern.text, matches, std::regex("^(\\s*)"));
+	std::string leftWhiteSpace = matches[0];
+	if (!leftWhiteSpace.empty()) {
+		if (leftWhiteSpace != " ") {
+			addWhiteSpaceWarning(0, leftWhiteSpace.size());
+		}
+		reference->pattern.replacePattern(0, leftWhiteSpace.size(), "");
+	}
+
+	// right
+	std::regex_search(reference->pattern.text, matches, std::regex("(\\s*)$"));
+	std::string rightWhiteSpace = matches[0];
+	if (!rightWhiteSpace.empty()) {
+		if (rightWhiteSpace != " ") {
+			addWhiteSpaceWarning(matches.position(), reference->pattern.text.size());
+		}
+		reference->pattern.replacePattern(0, rightWhiteSpace.size(), "");
+	}
+
 	// now, check if there's some extra space.
 	// match any whitespace except for ' '
 	std::regex spaceRegex = std::regex("\\s{2,}|[^\\S ]");
-	iter = {range.subString.begin(), range.subString.end(), spaceRegex};
-	for (; iter != end; ++iter) {
-		context.diagnostics.push_back(Diagnostic(
-			Diagnostic::Level::Warning, "all whitespace in patterns should be a single space",
-			range.subRange(iter->position(), iter->position() + iter->length())
-		));
-		// temporary fix
-		reference->pattern.replace(iter->position(), iter->position() + iter->length(), " ");
-	}
 
-	// also, trim the pattern.
-	std::regex nonWhiteSpaceRegex = std::regex("\\S");
-	std::find_rege
+	size_t lastIndex = 0;
+	std::cmatch charMatches;
+	while (std::regex_search(
+		reference->pattern.text.c_str() + lastIndex, reference->pattern.text.c_str() + reference->pattern.text.size(),
+		charMatches, spaceRegex
+	)) {
+		size_t matchPos = lastIndex + charMatches.position();
+		size_t endPos = matchPos + charMatches.length();
+
+		addWhiteSpaceWarning(matchPos, endPos);
+		// temporary fix
+		reference->pattern.replacePattern(matchPos, endPos, " ");
+		lastIndex = matchPos + " "sv.size();
+	}
 
 	if (reference->pattern.text == ""s + argumentChar) {
 		// this pattern has already been deduced.
