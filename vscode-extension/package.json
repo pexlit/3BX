@@ -28,6 +28,34 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "semanticTokenScopes": [
+      {
+        "language": "3bx",
+        "scopes": {
+          "expression": ["entity.name.function"],
+          "effect": ["keyword.control"],
+          "section": ["storage.type"],
+          "variable": ["variable"],
+          "comment": ["comment"],
+          "patternDefinition": ["string.regexp"],
+          "number": ["constant.numeric"],
+          "string": ["string"],
+          "intrinsic": ["support.function"]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "editor.semanticTokenColorCustomizations": {
+        "rules": {
+          "patternDefinition": {
+            "italic": true
+          },
+          "variable.definition": {
+            "bold": true
+          }
+        }
+      }
+    },
     "configuration": {
       "type": "object",
       "title": "3BX",

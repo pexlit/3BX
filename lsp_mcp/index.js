@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import net from 'net';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -12,6 +12,7 @@ class LSPClient {
   constructor() {
     this.messageId = 1;
     this.pendingRequests = new Map();
+    this.documentReadyResolvers = new Map();
     this.buffer = '';
     this.initialized = false;
   }
@@ -56,7 +57,25 @@ class LSPClient {
       } else {
         resolve(message.result);
       }
+    } else if (message.method === 'textDocument/publishDiagnostics') {
+      const uri = message.params.uri;
+      if (this.documentReadyResolvers.has(uri)) {
+        this.documentReadyResolvers.get(uri)();
+        this.documentReadyResolvers.delete(uri);
+      }
     }
+  }
+
+  waitForDocumentReady(uri, timeout = 5000) {
+    return new Promise((resolve) => {
+      this.documentReadyResolvers.set(uri, resolve);
+      setTimeout(() => {
+        if (this.documentReadyResolvers.has(uri)) {
+          this.documentReadyResolvers.delete(uri);
+          resolve();
+        }
+      }, timeout);
+    });
   }
 
   sendRequest(method, params) {
@@ -176,6 +195,12 @@ class StdioLSPClient extends LSPClient {
   }
 
   async connect() {
+    try {
+      execFileSync('which', [this.command], { stdio: 'pipe' });
+    } catch {
+      throw new Error(`LSP server binary '${this.command}' not found. Install it (e.g. sudo apt install clangd).`);
+    }
+
     return new Promise((resolve, reject) => {
       console.error(`Starting ${this.command} ${this.args.join(' ')}`);
 
@@ -229,7 +254,7 @@ class StdioLSPClient extends LSPClient {
 class MCPServer {
   constructor() {
     this.lspClients = new Map();
-    this.rootPath = process.env.PROJECT_ROOT || process.cwd();
+    this.rootPath = path.resolve(process.env.PROJECT_ROOT || process.cwd());
   }
 
   // Determine which LSP server to use based on file extension
@@ -298,7 +323,9 @@ class MCPServer {
         return;
       }
 
-      // Send didOpen notification
+      // Listen for diagnostics before opening, so we don't miss fast responses
+      const readyPromise = client.waitForDocumentReady(uri);
+
       client.sendNotification('textDocument/didOpen', {
         textDocument: {
           uri,
@@ -307,6 +334,9 @@ class MCPServer {
           text
         }
       });
+
+      // Wait for the server to finish parsing the file
+      await readyPromise;
     }
   }
 

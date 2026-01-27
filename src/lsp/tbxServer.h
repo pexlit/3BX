@@ -12,6 +12,7 @@ namespace lsp {
 class TbxServer : public LanguageServer {
   public:
 	explicit TbxServer(int port = 5007);
+	explicit TbxServer(std::unique_ptr<Transport> transport);
 	~TbxServer() override;
 
   protected:

@@ -1,6 +1,7 @@
 #pragma once
 #include "lspProtocol.h"
 #include "textDocument.h"
+#include "transport.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -9,10 +10,15 @@
 namespace lsp {
 
 // Base class for a Language Server Protocol server
-// Handles TCP socket, message framing, and request dispatch
+// Handles transport, message framing, and request dispatch
 class LanguageServer {
   public:
+	// TCP mode: listens on port, accepts connections
 	explicit LanguageServer(int port = 5007);
+
+	// Transport mode: uses provided transport directly (e.g., StdioTransport)
+	explicit LanguageServer(std::unique_ptr<Transport> transport);
+
 	virtual ~LanguageServer();
 
 	// Start the server (blocks until shutdown)
@@ -52,16 +58,12 @@ class LanguageServer {
 	std::unordered_map<std::string, std::unique_ptr<TextDocument>> documents;
 
   private:
-	int port;
-	int serverSocket = -1;
-	int clientSocket = -1;
+	int port = 0;
+	std::unique_ptr<Transport> transport;
 	bool running = false;
 
-	// TCP handling
-	bool setupSocket();
-	bool acceptConnection();
+	// Handle a single connection (reads messages until disconnect)
 	void handleConnection();
-	void closeConnection();
 
 	// Message framing
 	std::string readMessage();
@@ -76,7 +78,7 @@ class LanguageServer {
 	void sendResponse(const Json &id, const Json &result);
 	void sendError(const Json &id, int code, const std::string &message);
 
-	// Logging
+	// Logging (to stderr, so it doesn't interfere with stdio transport)
 	void log(const std::string &message);
 	void logError(const std::string &message);
 };

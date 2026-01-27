@@ -4,7 +4,7 @@
 namespace lsp {
 
 TextDocument::TextDocument(const std::string &uri, const std::string &content, int version)
-	: uri(uri), content(content), version(version) {
+	: SourceFile(uri, content), version(version) {
 	rebuildLineOffsets();
 }
 

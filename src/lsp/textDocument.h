@@ -1,17 +1,16 @@
 #pragma once
 #include "lspProtocol.h"
+#include "sourceFile.h"
 #include <string>
 #include <vector>
 
 namespace lsp {
 
 // Manages a single text document's content with incremental update support
-class TextDocument {
+class TextDocument : public SourceFile {
   public:
 	TextDocument(const std::string &uri, const std::string &content, int version);
 
-	std::string uri;
-	std::string content;
 	int version;
 
 	// Apply an incremental change to the document

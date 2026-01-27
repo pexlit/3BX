@@ -7,6 +7,6 @@ struct PatternMatch {
 	size_t lineStartPos;
 	size_t lineEndPos;
 	std::vector<PatternTreeNode *> nodesPassed{};
-	std::vector<VariableMatch> variableMatches{};
+	std::vector<VariableMatch> discoveredVariables{};
 	std::vector<PatternMatch> subMatches{};
 };

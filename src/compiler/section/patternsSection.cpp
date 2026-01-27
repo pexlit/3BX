@@ -3,7 +3,7 @@
 
 bool PatternsSection::processLine(ParseContext &, CodeLine *line) {
 	// directly add this line as pattern definition
-	parent->patternDefinitions.push_back(new PatternDefinition(Range(line, line->fullText)));
+	parent->patternDefinitions.push_back(new PatternDefinition(Range(line, line->fullText), parent));
 	return true;
 }
 

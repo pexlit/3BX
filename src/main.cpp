@@ -1,5 +1,7 @@
 #include "codegen/codegen.h"
 #include "compiler/compiler.h"
+#include "lsp/fileSystem.h"
+#include "lsp/stdioTransport.h"
 #include "lsp/tbxServer.h"
 #include "parseContext.h"
 #include <iostream>
@@ -12,13 +14,15 @@
 // to execute that executable: ./main
 // the compiler will always receive one source file, since that file imports all other files
 // if no arguments are given, the program will print its arguments to the console
-// --lsp flag starts the language server on port 5007
+// --lsp flag starts the language server on TCP port 5007
+// --stdio flag starts the language server on stdin/stdout (for MCP integration)
 // --emit-llvm outputs .ll file instead of executable
 int main(int argumentCount, char *argumentValues[]) {
 	std::vector<std::string> args(argumentValues + 1, argumentValues + argumentCount);
 
 	ParseContext context{};
 	bool runLSP = false;
+	bool useStdio = false;
 	bool waitDebugger = false;
 	std::string inputFile;
 
@@ -29,6 +33,8 @@ int main(int argumentCount, char *argumentValues[]) {
 			waitDebugger = true;
 		} else if (arg == "--lsp") {
 			runLSP = true;
+		} else if (arg == "--stdio") {
+			useStdio = true;
 		} else if (arg == "--emit-llvm") {
 			context.options.emitLLVM = true;
 		} else if (arg.starts_with("-o")) {
@@ -48,13 +54,20 @@ int main(int argumentCount, char *argumentValues[]) {
 		std::cerr << "Continuing..." << std::endl;
 	}
 
-	if (runLSP) {
-		lsp::TbxServer server;
-		server.run();
+	if (runLSP || useStdio) {
+		if (useStdio) {
+			lsp::TbxServer server(std::make_unique<lsp::StdioTransport>());
+			server.run();
+		} else {
+			lsp::TbxServer server;
+			server.run();
+		}
 		return 0;
 	}
 
 	if (!inputFile.empty()) {
+		lsp::LocalFileSystem localFs;
+		context.fileSystem = &localFs;
 		context.options.inputPath = inputFile;
 		if (compile(inputFile, context)) {
 			generateCode(context);

@@ -70,6 +70,7 @@ HEADER_DIRECTORIES(header_dir_list)
 # Set include paths
 #
 include_directories (${header_dir_list})
+include_directories (src)
 
 
 #

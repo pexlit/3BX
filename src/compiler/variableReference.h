@@ -6,4 +6,5 @@ struct VariableReference {
 	std::string name;
 	VariableReference *definition{};
 	VariableReference(Range range, const std::string &name) : range(range), name(name) {}
+	bool isDefinition() const { return definition == nullptr; }
 };

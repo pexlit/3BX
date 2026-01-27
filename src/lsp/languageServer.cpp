@@ -1,101 +1,57 @@
 #include "languageServer.h"
 #include "lspProtocol.h"
-#include <arpa/inet.h>
+#include "tcpTransport.h"
 #include <cstring>
 #include <iostream>
-#include <netinet/in.h>
-#include <sstream>
-#include <sys/socket.h>
-#include <unistd.h>
 
 namespace lsp {
 
 LanguageServer::LanguageServer(int port) : port(port) {}
 
+LanguageServer::LanguageServer(std::unique_ptr<Transport> transport) : transport(std::move(transport)) {}
+
 LanguageServer::~LanguageServer() { shutdown(); }
 
 void LanguageServer::run() {
-	if (!setupSocket()) {
-		logError("Failed to setup socket");
-		return;
-	}
-
 	running = true;
-	log("Language server listening on port " + std::to_string(port));
 
-	while (running) {
-		if (acceptConnection()) {
-			handleConnection();
-			closeConnection();
+	if (transport) {
+		// Direct transport mode (e.g., stdio)
+		log("Language server running on provided transport");
+		handleConnection();
+	} else {
+		// TCP server mode
+		TcpServer server(port);
+		if (!server.setup()) {
+			logError("Failed to setup TCP server");
+			return;
+		}
+
+		log("Language server listening on port " + std::to_string(port));
+
+		while (running) {
+			transport = server.acceptConnection();
+			if (transport) {
+				log("Client connected");
+				handleConnection();
+				transport.reset();
+				log("Client disconnected");
+			}
 		}
 	}
 
-	if (serverSocket >= 0) {
-		close(serverSocket);
-		serverSocket = -1;
-	}
+	running = false;
 }
 
 void LanguageServer::shutdown() {
 	running = false;
-	closeConnection();
-	if (serverSocket >= 0) {
-		close(serverSocket);
-		serverSocket = -1;
+	if (transport) {
+		transport->close();
 	}
-}
-
-bool LanguageServer::setupSocket() {
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverSocket < 0) {
-		logError("Failed to create socket: " + std::string(strerror(errno)));
-		return false;
-	}
-
-	// Allow socket reuse
-	int opt = 1;
-	if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-		logError("Failed to set socket options: " + std::string(strerror(errno)));
-		return false;
-	}
-
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = INADDR_ANY;
-	addr.sin_port = htons(port);
-
-	if (bind(serverSocket, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0) {
-		logError("Failed to bind socket: " + std::string(strerror(errno)));
-		return false;
-	}
-
-	if (listen(serverSocket, 1) < 0) {
-		logError("Failed to listen on socket: " + std::string(strerror(errno)));
-		return false;
-	}
-
-	return true;
-}
-
-bool LanguageServer::acceptConnection() {
-	struct sockaddr_in clientAddr;
-	socklen_t clientLen = sizeof(clientAddr);
-
-	clientSocket = accept(serverSocket, reinterpret_cast<struct sockaddr *>(&clientAddr), &clientLen);
-	if (clientSocket < 0) {
-		if (running) {
-			logError("Failed to accept connection: " + std::string(strerror(errno)));
-		}
-		return false;
-	}
-
-	log("Client connected");
-	return true;
 }
 
 void LanguageServer::handleConnection() {
-	while (running && clientSocket >= 0) {
+	while (running && transport && transport->isConnected()) {
 		std::string message = readMessage();
 		if (message.empty()) {
 			break;
@@ -110,22 +66,18 @@ void LanguageServer::handleConnection() {
 	}
 }
 
-void LanguageServer::closeConnection() {
-	if (clientSocket >= 0) {
-		close(clientSocket);
-		clientSocket = -1;
-		log("Client disconnected");
-	}
-}
-
 std::string LanguageServer::readMessage() {
+	if (!transport || !transport->isConnected()) {
+		return "";
+	}
+
 	// Read headers until empty line
 	std::string headers;
 	char c;
 	int consecutiveNewlines = 0;
 
-	while (running && clientSocket >= 0) {
-		ssize_t n = recv(clientSocket, &c, 1, 0);
+	while (running && transport->isConnected()) {
+		ssize_t n = transport->read(&c, 1);
 		if (n <= 0) {
 			return "";
 		}
@@ -163,8 +115,8 @@ std::string LanguageServer::readMessage() {
 	// Read body
 	std::string body(contentLength, '\0');
 	size_t totalRead = 0;
-	while (totalRead < contentLength && running && clientSocket >= 0) {
-		ssize_t n = recv(clientSocket, &body[totalRead], contentLength - totalRead, 0);
+	while (totalRead < contentLength && running && transport->isConnected()) {
+		ssize_t n = transport->read(&body[totalRead], contentLength - totalRead);
 		if (n <= 0) {
 			return "";
 		}
@@ -175,13 +127,17 @@ std::string LanguageServer::readMessage() {
 }
 
 void LanguageServer::sendMessage(const Json &message) {
+	if (!transport || !transport->isConnected()) {
+		return;
+	}
+
 	std::string body = message.dump();
 	std::string header = "Content-Length: " + std::to_string(body.length()) + "\r\n\r\n";
 	std::string fullMessage = header + body;
 
 	size_t totalSent = 0;
-	while (totalSent < fullMessage.size() && clientSocket >= 0) {
-		ssize_t n = send(clientSocket, fullMessage.c_str() + totalSent, fullMessage.size() - totalSent, 0);
+	while (totalSent < fullMessage.size() && transport->isConnected()) {
+		ssize_t n = transport->write(fullMessage.c_str() + totalSent, fullMessage.size() - totalSent);
 		if (n <= 0) {
 			logError("Failed to send message: " + std::string(strerror(errno)));
 			return;

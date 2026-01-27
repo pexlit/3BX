@@ -1,6 +1,11 @@
 #include "tbxServer.h"
 #include "codeLine.h"
 #include "compiler.h"
+#include "expression.h"
+#include "lspFileSystem.h"
+#include "patternMatch.h"
+#include "patternTreeNode.h"
+#include "section.h"
 #include "semanticTokenBuilder.h"
 #include "sourceFile.h"
 #include <algorithm>
@@ -9,6 +14,8 @@
 namespace lsp {
 
 TbxServer::TbxServer(int port) : LanguageServer(port) {}
+
+TbxServer::TbxServer(std::unique_ptr<Transport> transport) : LanguageServer(std::move(transport)) {}
 
 TbxServer::~TbxServer() = default;
 
@@ -43,45 +50,13 @@ void TbxServer::recompileDocument(const std::string &uri) {
 		return;
 	}
 
-	const std::string &content = docIt->second->content;
-
-	// Create new parse context
+	// Create new parse context with LSP file system
 	auto context = std::make_unique<ParseContext>();
+	LspFileSystem lspFs(documents);
+	context->fileSystem = &lspFs;
 
-	// Create source file from content
-	SourceFile *sourceFile = new SourceFile(uri, content);
-
-	// Parse content line by line (similar to importSourceFile in compiler.cpp)
-	const std::regex lineWithTerminatorRegex("([^\r\n]*(?:\r\n|\r|\n))|([^\r\n]+$)");
-	std::string_view fileView{sourceFile->content};
-
-	std::cregex_iterator iter(fileView.begin(), fileView.end(), lineWithTerminatorRegex);
-	std::cregex_iterator end;
-	int sourceFileLineIndex = 0;
-
-	for (; iter != end; ++iter, ++sourceFileLineIndex) {
-		std::string_view lineString = fileView.substr(iter->position(), iter->length());
-		CodeLine *line = new CodeLine(lineString, sourceFile);
-		line->sourceFileLineIndex = sourceFileLineIndex;
-
-		// Remove comments and trim whitespace from the right
-		std::cmatch match;
-		std::regex_search(lineString.begin(), lineString.end(), match, std::regex("[\\s]*(?:#[\\S\\s]*)?$"));
-		line->rightTrimmedText = lineString.substr(0, match.position());
-
-		// Handle import statements - for now, mark as resolved
-		// (Full import handling would require file system access)
-		if (line->rightTrimmedText.starts_with("import ")) {
-			line->resolved = true;
-		}
-
-		line->mergedLineIndex = context->codeLines.size();
-		context->codeLines.push_back(line);
-	}
-
-	// Analyze sections and resolve patterns
-	analyzeSections(*context);
-	resolvePatterns(*context);
+	// Use the compiler to parse and analyze
+	compile(uri, *context);
 
 	// Convert diagnostics
 	std::vector<Diagnostic> lspDiagnostics;
@@ -246,81 +221,79 @@ std::vector<int> TbxServer::generateSemanticTokens(const std::string &uri) {
 	};
 
 	// Walk through the parse context and collect tokens
-	// Order matters: variables first, then patterns (deeper submatches first)
+	// Order: variables → pattern matches → pattern definitions → comments (small to big, earlier slices later)
 
-	std::function<void(Section *)> processSection = [&](Section *section) {
-		if (!section)
-			return;
-
-		// 1. First add variable reference tokens (highest priority)
+	std::function<void(Section *)> tokenizeVariables = [&](Section *section) {
 		for (auto &[name, refs] : section->variableReferences) {
 			for (VariableReference *ref : refs) {
-				bool isDefinition = (section->variableDefinitions.count(name) && section->variableDefinitions.at(name) == ref);
-				addToken(ref->range, SemanticTokenType::Variable, isDefinition);
+				addToken(ref->range, SemanticTokenType::Variable, ref->isDefinition());
 			}
 		}
-
-		// Recursively process children first (they have higher priority for patterns)
 		for (Section *child : section->children) {
-			processSection(child);
+			tokenizeVariables(child);
 		}
 	};
 
-	// First pass: collect all variable tokens
-	processSection(context->mainSection);
+	tokenizeVariables(context->mainSection);
 
-	// Second pass: add pattern definitions (sliced around variables)
-	std::function<void(Section *)> processPatternDefs = [&](Section *section) {
-		if (!section)
-			return;
+	// Walk expression trees depth-first (children before parent, small tokens slice big ones)
+	std::function<void(const Expression *, CodeLine *)> tokenizeExpression = [&](const Expression *expr, CodeLine *line) {
+		// Tokenize arguments first (depth-first)
+		for (const Expression *arg : expr->arguments) {
+			tokenizeExpression(arg, line);
+		}
 
-		// Process pattern definitions in this section
+		switch (expr->kind) {
+		case Expression::Kind::Literal:
+			if (std::holds_alternative<std::string>(expr->literalValue)) {
+				addToken(expr->range, SemanticTokenType::String, false);
+			} else if (std::holds_alternative<int64_t>(expr->literalValue) ||
+					   std::holds_alternative<double>(expr->literalValue)) {
+				addToken(expr->range, SemanticTokenType::Number, false);
+			}
+			break;
+		case Expression::Kind::IntrinsicCall:
+			addToken(expr->range, SemanticTokenType::Intrinsic, false);
+			break;
+		case Expression::Kind::PatternCall:
+			if (expr->patternMatch && expr->patternMatch->matchedEndNode &&
+				expr->patternMatch->matchedEndNode->matchingDefinition) {
+				SectionType sectionType = expr->patternMatch->matchedEndNode->matchingDefinition->section->type;
+				SemanticTokenType tokenType =
+					sectionType == SectionType::Expression ? SemanticTokenType::Expression : SemanticTokenType::Effect;
+				addToken(expr->range, tokenType, false);
+			}
+			break;
+		default:
+			break;
+		}
+	};
+
+	for (CodeLine *line : context->codeLines) {
+		if (line->sourceFile->uri != uri || !line->expression)
+			continue;
+		tokenizeExpression(line->expression, line);
+	}
+
+	std::function<void(Section *)> tokenizePatternDefinitions = [&](Section *section) {
 		for (PatternDefinition *def : section->patternDefinitions) {
 			addToken(def->range, SemanticTokenType::PatternDefinition, true);
 		}
-
-		// Recursively process children
 		for (Section *child : section->children) {
-			processPatternDefs(child);
+			tokenizePatternDefinitions(child);
 		}
 	};
 
-	processPatternDefs(context->mainSection);
+	tokenizePatternDefinitions(context->mainSection);
 
-	// Third pass: add pattern references (sliced around variables and definitions)
-	std::function<void(Section *)> processPatternRefs = [&](Section *section) {
-		if (!section)
-			return;
+	// Section openings cover entire lines
+	for (CodeLine *line : context->codeLines) {
+		if (line->sourceFile->uri != uri || !line->sectionOpening)
+			continue;
+		addToken(::Range(line, line->rightTrimmedText), SemanticTokenType::Section, false);
+	}
 
-		// Process pattern references
-		for (PatternReference *ref : section->patternReferences) {
-			SemanticTokenType tokenType;
-			switch (ref->patternType) {
-			case SectionType::Expression:
-				tokenType = SemanticTokenType::Expression;
-				break;
-			case SectionType::Effect:
-				tokenType = SemanticTokenType::Effect;
-				break;
-			case SectionType::Section:
-				tokenType = SemanticTokenType::Section;
-				break;
-			default:
-				tokenType = SemanticTokenType::PatternDefinition;
-				break;
-			}
-			addToken(ref->range, tokenType, false);
-		}
-
-		// Recursively process children
-		for (Section *child : section->children) {
-			processPatternRefs(child);
-		}
-	};
-
-	processPatternRefs(context->mainSection);
-
-	// Also scan for comments (lowest priority, sliced around everything)
+	// Comments (lowest priority, sliced around everything)
 	for (CodeLine *line : context->codeLines) {
 		if (line->sourceFile->uri != uri) {
 			continue;

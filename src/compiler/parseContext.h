@@ -1,11 +1,13 @@
 #pragma once
 #include "codeLine.h"
 #include "diagnostic.h"
+#include "lsp/fileSystem.h"
 #include "patternMatch.h"
 #include "patternTreeNode.h"
 #include "section.h"
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace llvm {
@@ -24,12 +26,17 @@ struct ParseContext {
 		int maxResolutionIterations = 0x100;
 	} options;
 
+	// File system for reading source files (imports)
+	lsp::FileSystem *fileSystem{};
+
 	// LLVM codegen state (initialized in codegen.cpp)
 	llvm::LLVMContext *llvmContext{};
 	llvm::Module *llvmModule{};
 	llvm::IRBuilderBase *llvmBuilder{};
 	std::unordered_map<std::string, llvm::AllocaInst *> llvmVariables;
 
+	// imported source files by path (also prevents circular imports)
+	std::unordered_map<std::string, lsp::SourceFile *> importedFiles;
 	// all code lines in 'chronological' order: imported code lines get put before the import statement
 	std::vector<CodeLine *> codeLines;
 	std::vector<Diagnostic> diagnostics;

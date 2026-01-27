@@ -13,12 +13,15 @@ enum class SemanticTokenType {
 	Variable = 3,
 	Comment = 4,
 	PatternDefinition = 5,
+	Number = 6,
+	String = 7,
+	Intrinsic = 8,
 	Count
 };
 
 // Get the token type names for the legend
 inline std::vector<std::string> getSemanticTokenTypes() {
-	return {"expression", "effect", "section", "variable", "comment", "patternDefinition"};
+	return {"expression", "effect", "section", "variable", "comment", "patternDefinition", "number", "string", "intrinsic"};
 }
 
 // 3BX-specific semantic token modifiers

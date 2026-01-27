@@ -39,7 +39,7 @@ Section *Section::createSection(ParseContext &context, CodeLine *line) {
 			// check if there's a pattern right after the name (f.e. "effect set val to var" <- right after "effect ")
 			std::string_view sectionPatternString = line->patternText.substr(spaceIndex + 1);
 			if (sectionPatternString.length()) {
-				newSection->patternDefinitions.push_back(new PatternDefinition(Range(line, sectionPatternString)));
+				newSection->patternDefinitions.push_back(new PatternDefinition(Range(line, sectionPatternString), newSection));
 			}
 		}
 	}
@@ -251,8 +251,6 @@ Section::detectPatternsRecursively(ParseContext &context, Range range, StringHie
 					if (intrinsicExpr->intrinsicName.empty() && argExpr->kind == Expression::Kind::Literal) {
 						if (auto *str = std::get_if<std::string>(&argExpr->literalValue)) {
 							intrinsicExpr->intrinsicName = *str;
-							delete argExpr;
-							return true;
 						}
 					}
 					intrinsicExpr->arguments.push_back(argExpr);
@@ -382,13 +380,15 @@ void Section::searchParentPatterns(ParseContext &context, VariableReference *ref
 					element.type = PatternElement::Type::Variable;
 					if (!found) {
 						// add a variable definition for this pattern element
-						variableDefinitions[element.text] = new VariableReference(
+						VariableReference *varRef = new VariableReference(
 							Range(
 								definition->range.line, definition->range.start() + element.startPos,
 								definition->range.start() + element.startPos + element.text.length()
 							),
 							element.text
 						);
+						variableDefinitions[element.text] = varRef;
+						variableReferences[element.text].push_back(varRef);
 					}
 				}
 				if (!found)

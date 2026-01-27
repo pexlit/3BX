@@ -34,7 +34,7 @@ std::vector<MatchProgress> MatchProgress::step() {
 		nextMatches.push_back(stepUp);
 	};
 
-	if (currentNode->matchingSection) {
+	if (currentNode->matchingDefinition) {
 		// end node found
 
 		if (!parent && sourceElementIndex == patternReference->patternElements.size()) {
@@ -104,7 +104,7 @@ std::vector<MatchProgress> MatchProgress::step() {
 				if (elementToCompare.type == PatternElement::Type::VariableLike) {
 					size_t lineStart = patternReference->pattern.getLinePos(patternPos);
 					size_t lineEnd = patternReference->pattern.getLinePos(patternPos + elementToCompare.text.size());
-					substituteStep.match.variableMatches.push_back({elementToCompare.text, lineStart, lineEnd});
+					substituteStep.match.discoveredVariables.push_back({elementToCompare.text, lineStart, lineEnd});
 				}
 				substituteStep.patternPos += elementToCompare.text.size();
 				nextMatches.push_back(substituteStep);

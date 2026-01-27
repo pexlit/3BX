@@ -2,15 +2,17 @@
 #include "patternElement.h"
 #include <string>
 
+namespace lsp {
 struct SourceFile;
+}
 struct Section;
 struct Expression;
 
 struct CodeLine {
-	CodeLine(std::string_view fullText, SourceFile *sourceFile) : sourceFile(sourceFile), fullText(fullText) {}
+	CodeLine(std::string_view fullText, lsp::SourceFile *sourceFile) : sourceFile(sourceFile), fullText(fullText) {}
 
 	// the source file in which this line resides
-	SourceFile *sourceFile;
+	lsp::SourceFile *sourceFile;
 
 	// the line index in the source file
 	int sourceFileLineIndex;

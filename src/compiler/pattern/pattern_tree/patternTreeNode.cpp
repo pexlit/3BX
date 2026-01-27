@@ -1,6 +1,6 @@
 #include "patternTreeNode.h"
 
-void PatternTreeNode::addPatternPart(std::vector<PatternElement> &elements, Section *matchingSection, size_t index) {
+void PatternTreeNode::addPatternPart(std::vector<PatternElement> &elements, PatternDefinition *definition, size_t index) {
 	PatternTreeNode *currentNode = this;
 	for (; index < elements.size(); index++) {
 		PatternElement currentElement = elements[index];
@@ -9,7 +9,8 @@ void PatternTreeNode::addPatternPart(std::vector<PatternElement> &elements, Sect
 				currentNode->argumentChild = new PatternTreeNode(currentElement.type, currentElement.text);
 			}
 			currentNode = currentNode->argumentChild;
-
+			// Store the parameter name for this definition
+			currentNode->parameterNames[definition] = currentElement.text;
 		} else {
 			if (!currentNode->literalChildren.count(currentElement.text)) {
 				currentNode->literalChildren[currentElement.text] =
@@ -18,5 +19,5 @@ void PatternTreeNode::addPatternPart(std::vector<PatternElement> &elements, Sect
 			currentNode = currentNode->literalChildren[currentElement.text];
 		}
 	}
-	currentNode->matchingSection = matchingSection;
+	currentNode->matchingDefinition = definition;
 }

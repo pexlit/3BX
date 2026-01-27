@@ -1,12 +1,11 @@
 {
   "mcpServers": {
     "lsp": {
-      "command": "node",
-      "args": ["./lsp_mcp/index.js"],
-      "env": {
-        "PROJECT_ROOT": "."
-      },
-      "cwd": "."
+      "command": "/home/johnheikens/go/bin/mcp-language-server",
+      "args": [
+        "-workspace", "/home/johnheikens/Documents/Github/3BX",
+        "-lsp", "clangd", "--", "--background-index"
+      ]
     }
   }
 }

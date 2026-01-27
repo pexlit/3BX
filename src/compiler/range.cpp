@@ -6,6 +6,9 @@ Range::Range(CodeLine *line, int start, int end) : line(line), subString(line->f
 Range::Range(CodeLine *line, std::string_view subString) : line(line), subString(subString) {}
 
 std::string Range::toString() const {
+	if (!line) {
+		return "<unknown location>";
+	}
 	// link should be clickable in vs code
 	// one-based index
 	return line->sourceFile->uri + ":" + std::to_string(line->sourceFileLineIndex + 1) + ":" + std::to_string(start() + 1) +

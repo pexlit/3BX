@@ -8,7 +8,7 @@ size_t TransformedPattern::transformPosition(
 ) {
 	for (KeyFrame frame : keyframes | std::views::reverse) {
 		size_t inPos = keyFrameToInpos(frame);
-		if (inPos < position) {
+		if (inPos <= position) {
 			return keyFrameToOutPos(frame) + position - inPos;
 		}
 	}
@@ -46,7 +46,7 @@ void TransformedPattern::replaceLocal(
 	int shift = (patternEndPos - patternStartPos) + replacement.length();
 	if (shift) {
 		bool added{};
-		const KeyFrame &newKeyFrame{.patternPos = patternEndPos, .linePos = lineEndPos};
+		const KeyFrame &newKeyFrame{.patternPos = patternStartPos + replacement.length(), .linePos = lineEndPos};
 		for (auto it = keyframes.begin(); it != keyframes.end();) {
 			KeyFrame &keyFrame = *it;
 			if (keyFrame.patternPos > patternStartPos) {

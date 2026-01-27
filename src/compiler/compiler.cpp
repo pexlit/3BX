@@ -1,10 +1,10 @@
 #include "compiler.h"
 #include "IndentData.h"
 #include "expression.h"
-#include "fileFunctions.h"
+#include "lsp/fileSystem.h"
+#include "lsp/sourceFile.h"
 #include "patternElement.h"
 #include "patternTreeNode.h"
-#include "sourceFile.h"
 #include "stringFunctions.h"
 #include "variable.h"
 #include <algorithm>
@@ -22,15 +22,19 @@ bool compile(const std::string &path, ParseContext &context) {
 }
 
 bool importSourceFile(const std::string &path, ParseContext &context) {
-	std::string text;
+	// Check if already imported (circular import protection)
+	if (context.importedFiles.contains(path)) {
+		return true; // Already processed, skip
+	}
 
-	if (!readStringFromFile(path, text)) {
+	lsp::SourceFile *sourceFile = context.fileSystem->getFile(path);
+	if (!sourceFile) {
 		return false;
 	}
 
-	// iterate over lines, each match includes the line terminator
-	SourceFile *sourceFile = new SourceFile(path, text);
+	context.importedFiles[path] = sourceFile;
 
+	// iterate over lines, each match includes the line terminator
 	std::string_view fileView{sourceFile->content};
 
 	std::cregex_iterator iter(fileView.begin(), fileView.end(), lineWithTerminatorRegex);
@@ -165,14 +169,14 @@ bool analyzeSections(ParseContext &context) {
 	return true;
 }
 
-void addVariableReferencesFromMatch(ParseContext &context, PatternReference *reference, const PatternMatch &match) {
-	for (const VariableMatch &varMatch : match.variableMatches) {
-		reference->range.line->section->addVariableReference(
-			context,
-			new VariableReference(Range(reference->range.line, varMatch.lineStartPos, varMatch.lineEndPos), varMatch.name)
-		);
+void addVariableReferencesFromMatch(ParseContext &context, PatternReference *reference, PatternMatch &match) {
+	for (VariableMatch &varMatch : match.discoveredVariables) {
+		VariableReference *varRef =
+			new VariableReference(Range(reference->range.line, varMatch.lineStartPos, varMatch.lineEndPos), varMatch.name);
+		varMatch.variableReference = varRef;
+		reference->range.line->section->addVariableReference(context, varRef);
 	}
-	for (const PatternMatch &subMatch : match.subMatches) {
+	for (PatternMatch &subMatch : match.subMatches) {
 		addVariableReferencesFromMatch(context, reference, subMatch);
 	}
 }
@@ -205,6 +209,15 @@ void expandExpression(Expression *expr, Section *section) {
 				// Recursively expand the submatch arguments
 				expandExpression(arg, section);
 			}
+
+			// Handle discoveredVariables - add Variable expressions using stored references
+			for (const VariableMatch &varMatch : ref->match->discoveredVariables) {
+				Expression *arg = new Expression();
+				arg->kind = Expression::Kind::Variable;
+				arg->variable = varMatch.variableReference;
+				arg->range = varMatch.variableReference->range;
+				expr->arguments.push_back(arg);
+			}
 		} else if (ref->patternElements.size() == 1 && ref->patternElements[0].type == PatternElement::Type::VariableLike) {
 			// Resolved to a variable reference
 			expr->kind = Expression::Kind::Variable;
@@ -214,6 +227,14 @@ void expandExpression(Expression *expr, Section *section) {
 			if (it != section->variableReferences.end() && !it->second.empty()) {
 				expr->variable = it->second.front();
 			}
+		} else if (expr->arguments.size() == 1 && expr->arguments[0]->kind == Expression::Kind::IntrinsicCall) {
+			// If the pattern is just an argument placeholder and we have a single intrinsic call,
+			// promote the intrinsic to be this expression
+			Expression *intrinsic = expr->arguments[0];
+			expr->kind = intrinsic->kind;
+			expr->intrinsicName = intrinsic->intrinsicName;
+			expr->arguments = intrinsic->arguments;
+			expr->range = intrinsic->range;
 		}
 	}
 }
@@ -283,7 +304,7 @@ bool resolvePatterns(ParseContext &context) {
 					}
 					if (definition->resolved) {
 						// we can add this definition already, to help resolve more references
-						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, section);
+						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, definition);
 					}
 				}
 			}
@@ -299,7 +320,7 @@ bool resolvePatterns(ParseContext &context) {
 					if (!definition->resolved) {
 						definition->resolved = true;
 
-						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, section);
+						context.patternTrees[(size_t)section->type]->addPatternPart(definition->patternElements, definition);
 					}
 				}
 			}
@@ -370,7 +391,8 @@ bool resolvePatterns(ParseContext &context) {
 
 					// link all references to the definition
 					for (VariableReference *ref : groupRefs) {
-						ref->definition = definition;
+						if (ref != definition)
+							ref->definition = definition;
 					}
 				}
 			}
