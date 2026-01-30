@@ -254,7 +254,8 @@ static llvm::Value *generateExpressionCode(ParseContext &context, Expression *ex
 		// Find the function for this pattern
 		auto funcIt = sectionFunctions.find(matchedSection);
 		if (funcIt == sectionFunctions.end()) {
-			context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "No function generated for pattern", expr->range)
+			context.diagnostics.push_back(
+				Diagnostic(Diagnostic::Level::Error, "No function generated for pattern", expr->range)
 			);
 			return nullptr;
 		}
@@ -266,7 +267,6 @@ static llvm::Value *generateExpressionCode(ParseContext &context, Expression *ex
 		std::sort(sortedArgs.begin(), sortedArgs.end(), [](Expression *a, Expression *b) {
 			return a->range.start() < b->range.start();
 		});
-
 		// Walk through nodesPassed to find argument nodes in order
 		// Each argument node corresponds to the next argument expression (by position order)
 		std::vector<llvm::Value *> args;
@@ -276,6 +276,7 @@ static llvm::Value *generateExpressionCode(ParseContext &context, Expression *ex
 			// Check if this is an argument node (has parameter name for this definition)
 			auto paramIt = node->parameterNames.find(matchedDef);
 			if (paramIt != node->parameterNames.end() && argIndex < sortedArgs.size()) {
+				llvm::errs() << "  Found param node: " << paramIt->second << "\n";
 				Expression *argExpr = sortedArgs[argIndex++];
 				llvm::Value *argVal = generateExpressionCode(context, argExpr);
 				if (argVal) {
@@ -345,7 +346,8 @@ generateIntrinsicCode(ParseContext &context, const std::string &name, const std:
 				builder.CreateStore(val, ptr);
 			} else {
 				// If it's a value, we can't store to it - error
-				context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "Cannot store to non-pointer value", Range())
+				context.diagnostics.push_back(
+					Diagnostic(Diagnostic::Level::Error, "Cannot store to non-pointer value", Range())
 				);
 			}
 		}
@@ -434,6 +436,11 @@ bool generateCode(ParseContext &context) {
 	std::string error;
 	llvm::raw_string_ostream errorStream(error);
 	if (llvm::verifyModule(*context.llvmModule, &errorStream)) {
+		// Print the invalid IR for debugging
+		llvm::errs() << "\n=== Invalid LLVM IR (for debugging) ===\n";
+		context.llvmModule->print(llvm::errs(), nullptr);
+		llvm::errs() << "=== End Invalid LLVM IR ===\n\n";
+
 		context.diagnostics.push_back(Diagnostic(Diagnostic::Level::Error, "LLVM verification failed: " + error, Range()));
 		return false;
 	}
